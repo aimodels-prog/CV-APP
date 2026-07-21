@@ -7,6 +7,9 @@ The application now has one persistence engine: PostgreSQL through the Express `
 ```text
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
 DATABASE_POOL_MAX=10
+DATABASE_SSL=true
+DATABASE_SSL_REJECT_UNAUTHORIZED=true
+DATABASE_CA_CERT=<managed database CA certificate>
 VITE_POSTGRES_API_BASE=/api/v2
 ```
 
@@ -29,6 +32,6 @@ VITE_POSTGRES_API_BASE=/api/v2
 
 ## Production safety
 
-Run migrations during deployment before starting the application. Configure TLS using the DigitalOcean connection string (`sslmode=require`). Production write endpoints also require the application's authorization boundary; do not expose `API_ADMIN_TOKEN` in frontend Vite variables.
+Run migrations during deployment before starting the application. On DigitalOcean App Platform, bind `DATABASE_URL` to `${database-component.DATABASE_PRIVATE_URL}` and `DATABASE_CA_CERT` to `${database-component.CA_CERT}`. Keep certificate verification enabled. Production write endpoints also require the application's authorization boundary; do not expose `API_ADMIN_TOKEN` in frontend Vite variables.
 
 PostgreSQL backups must be managed server-side using DigitalOcean managed-database backups or `pg_dump`. Browser backup/import controls were removed from the runtime application.
