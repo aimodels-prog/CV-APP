@@ -1,0 +1,318 @@
+import React, { useState, useEffect } from "react";
+import { motion } from 'motion/react';
+import { X, Save, Layers, User, Calendar, Edit2, AlertCircle, Loader2, Image as ImageIcon } from 'lucide-react';
+import clsx from 'clsx';
+import { api } from '../lib/api';
+
+interface ConfirmTenderModalProps {
+  tender: any;
+  onSave: (tender: any) => Promise<void>;
+  onCancel: () => void;
+}
+
+export function ConfirmTenderModal({ tender, onSave, onCancel }: ConfirmTenderModalProps) {
+  const [editedTender, setEditedTender] = useState({
+    ...tender,
+    name: tender.name || tender.tender_title || '',
+    internal_code: tender.internal_code || tender.tender_number || `TEN-${Math.floor(Math.random()*10000)}`,
+    client: tender.client || '',
+    tender_format: tender.tender_format || 'GEN-X1',
+    positions: tender.positions?.map((p: any) => ({ ...p })) || [],
+    branding: tender.branding || { header_base64: "", footer_base64: "" }
+  });
+
+  React.useEffect(() => {
+    setEditedTender({
+      ...tender,
+      name: tender.name || tender.tender_title || '',
+      internal_code: tender.internal_code || tender.tender_number || `TEN-${Math.floor(Math.random()*10000)}`,
+      client: tender.client || '',
+      tender_format: tender.tender_format || 'GEN-X1',
+      positions: tender.positions?.map((p: any) => ({ ...p })) || [],
+      branding: tender.branding || { header_base64: "", footer_base64: "" }
+    });
+  }, [tender]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [brandings, setBrandings] = useState<any[]>([]);
+  const [selectedBrandingId, setSelectedBrandingId] = useState<string>('');
+
+  useEffect(() => {
+    async function load() {
+      const data = await api.getBrandings();
+      setBrandings(data);
+      
+      const currentHeader = tender.branding?.header_base64;
+      const currentFooter = tender.branding?.footer_base64;
+      if (currentHeader || currentFooter) {
+        const match = data.find((b: any) => b.header_base64 === currentHeader && b.footer_base64 === currentFooter);
+        if (match) {
+          setSelectedBrandingId(match.id);
+        }
+      }
+    }
+    load();
+  }, [tender]);
+
+  const handleSelectBranding = (id: string) => {
+    setSelectedBrandingId(id);
+    const match = brandings.find(b => b.id === id);
+    if (match) {
+      setEditedTender(prev => ({
+        ...prev,
+        branding: { header_base64: match.header_base64, footer_base64: match.footer_base64 }
+      }));
+    } else {
+      setEditedTender(prev => ({
+        ...prev,
+        branding: { header_base64: "", footer_base64: "" }
+      }));
+    }
+  };
+
+
+  const handlePositionChange = (idx: number, field: string, value: any) => {
+    const newPositions = [...editedTender.positions];
+    newPositions[idx] = { ...newPositions[idx], [field]: value };
+    setEditedTender({ ...editedTender, positions: newPositions });
+  };
+
+  
+  const handleSave = async () => {
+    if (!editedTender.internal_code || !editedTender.internal_code.trim()) {
+      alert("Internal Code is required.");
+      return;
+    }
+    setIsSaving(true);
+    await onSave(editedTender);
+    setIsSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+      >
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <AlertCircle size={20} className="text-amber-500" />
+              Human-in-the-Loop Verification
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">Review and confirm the extracted/imported tender requirements before saving.</p>
+          </div>
+          <button 
+            onClick={onCancel}
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Internal Code</label>
+              <input 
+                type="text" 
+                value={editedTender.internal_code || ''}
+                onChange={e => setEditedTender({...editedTender, internal_code: e.target.value})}
+                placeholder="e.g. TEN-001"
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Tender Name</label>
+              <input 
+                type="text" 
+                value={editedTender.name}
+                onChange={e => setEditedTender({...editedTender, name: e.target.value})}
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Client Authority</label>
+              <input 
+                type="text" 
+                value={editedTender.client}
+                onChange={e => setEditedTender({...editedTender, client: e.target.value})}
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Document Format / Source</label>
+              <input 
+                type="text" 
+                value={editedTender.tender_format}
+                onChange={e => setEditedTender({...editedTender, tender_format: e.target.value})}
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Extracted Positions ({editedTender.positions.length})</h3>
+            </div>
+            
+            <div className="space-y-4">
+              {editedTender.positions.map((pos: any, idx: number) => (
+                <div key={idx} className="p-4 border border-slate-200 rounded-xl bg-slate-50/50">
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Position Title</label>
+                      <input 
+                        type="text" 
+                        value={pos.position_title || pos.title || ''}
+                        onChange={e => handlePositionChange(idx, 'position_title', e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm font-medium focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Quantities Needed</label>
+                      <input 
+                        type="number" 
+                        value={pos.quantity || 1}
+                        onChange={e => handlePositionChange(idx, 'quantity', parseInt(e.target.value))}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Years Exp Reqd.</label>
+                      <input 
+                        type="number" 
+                        value={pos.minimum_years_experience || pos.years_experience || pos.required_years || 0}
+                        onChange={e => handlePositionChange(idx, 'minimum_years_experience', parseInt(e.target.value))}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Nationality Quota</label>
+                      <input 
+                        type="text" 
+                        value={pos.nationality_preference || 'Any'}
+                        onChange={e => handlePositionChange(idx, 'nationality_preference', e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1 mt-4">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Education Requirement</label>
+                    <textarea 
+                      value={pos.minimum_education || ''}
+                      onChange={e => handlePositionChange(idx, 'minimum_education', e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm focus:border-blue-500 outline-none min-h-[40px]"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1 mt-4">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Role Description</label>
+                    <textarea 
+                      value={pos.role_description || ''}
+                      onChange={e => handlePositionChange(idx, 'role_description', e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm focus:border-blue-500 outline-none min-h-[60px]"
+                    />
+                  </div>
+
+                  <div className="space-y-1 mt-4">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">General Experience</label>
+                    <textarea 
+                      value={pos.general_experience || ''}
+                      onChange={e => handlePositionChange(idx, 'general_experience', e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm focus:border-blue-500 outline-none min-h-[60px]"
+                    />
+                  </div>
+
+                  <div className="space-y-1 mt-4">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Specific Experience</label>
+                    <textarea 
+                      value={pos.specific_experience || ''}
+                      onChange={e => handlePositionChange(idx, 'specific_experience', e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm focus:border-blue-500 outline-none min-h-[60px]"
+                    />
+                  </div>
+                </div>
+              ))}
+              
+              {editedTender.positions.length === 0 && (
+                <div className="px-6 py-8 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm">
+                  No positions extracted by AI. You may need to cancel and try again or edit the source document.
+                </div>
+              )}
+            </div>
+          </div>
+          
+          
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Tender Branding</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Select Branding Profile</label>
+                <select
+                  value={selectedBrandingId}
+                  onChange={(e) => handleSelectBranding(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none shadow-sm"
+                >
+                  <option value="">-- Select a branding profile --</option>
+                  {brandings.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1 pl-1">You can create new branding profiles in Settings.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Header Preview</label>
+                  <div className="relative aspect-[4/1] bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden">
+                    {editedTender.branding?.header_base64 ? (
+                      <img src={editedTender.branding.header_base64} className="w-full h-full object-contain p-2" alt="Header preview" />
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">No header</span>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Footer Preview</label>
+                  <div className="relative aspect-[4/1] bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden">
+                    {editedTender.branding?.footer_base64 ? (
+                      <img src={editedTender.branding.footer_base64} className="w-full h-full object-contain p-2" alt="Footer preview" />
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">No footer</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div className="p-6 border-t border-slate-100 bg-white flex items-center justify-end gap-3">
+          <button 
+            onClick={onCancel}
+            disabled={isSaving}
+            className="px-6 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border border-slate-200"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-[#2563eb] hover:bg-blue-700 text-white transition-colors shadow-sm disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Confirm & Save Tender
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
