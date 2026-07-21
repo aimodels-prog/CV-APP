@@ -46,6 +46,8 @@ Reference values can be submitted using either their stable code or displayed la
 
 The API maps PostgreSQL records back to the existing frontend object shapes while retaining full nested data in `JSONB`.
 
+Optional application settings return HTTP 200 with `value: null` and `exists: false` until they are first saved. This allows fresh deployments to use application defaults without producing expected 404 errors in the browser.
+
 ## Validation and errors
 
 - Write bodies are type-checked at the HTTP boundary.

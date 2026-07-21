@@ -1392,13 +1392,21 @@ export function createPostgresApiRouter(pool: Pool) {
         [req.params.key],
       );
       if (!result.rowCount) {
-        throw new HttpError(404, "NOT_FOUND", "Setting not found.");
+        res.json({
+          key: req.params.key,
+          value: null,
+          isSecret: false,
+          exists: false,
+          updatedAt: null,
+        });
+        return;
       }
       const setting = result.rows[0];
       res.json({
         key: setting.key,
         value: setting.is_secret ? { configured: true } : setting.value,
         isSecret: setting.is_secret,
+        exists: true,
         updatedAt: setting.updated_at,
       });
     }),
