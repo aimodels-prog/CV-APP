@@ -68,7 +68,7 @@ async function run() {
   process.env.NODE_ENV = "test";
   process.env.PORTAL_SSO_SECRET = secret;
   process.env.PORTAL_SSO_ISSUER = "via-portal";
-  process.env.PORTAL_SSO_AUDIENCE = "via-cv";
+  process.env.PORTAL_SSO_AUDIENCE = "via-cv-generation";
   process.env.PORTAL_URL = "https://portal.via-int.com";
   process.env.APP_PUBLIC_URL = "https://cv.example.com";
 
@@ -97,8 +97,8 @@ async function run() {
     const now = Math.floor(Date.now() / 1000);
     const basePayload = {
       iss: "via-portal",
-      aud: "via-cv",
-      appSlug: "via-cv",
+      aud: "via-cv-generation",
+      appSlug: "via-cv-generation",
       email: "user@via-int.com",
       name: "VIA User",
       role: "user",

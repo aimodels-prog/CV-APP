@@ -5,7 +5,6 @@ import type { Pool, PoolClient } from "pg";
 import { v4 as uuidv4 } from "uuid";
 
 const REQUIRED_ISSUER = "via-portal";
-const REQUIRED_APP_SLUG = "via-cv";
 const SESSION_COOKIE = "__Host-via_cv_session";
 const VIA_EMAIL_PATTERN = /^[^@\s]+@via-int\.com$/i;
 
@@ -33,7 +32,7 @@ export interface PortalSessionUser {
 interface PortalSsoConfig {
   secret: string;
   issuer: typeof REQUIRED_ISSUER;
-  audience: typeof REQUIRED_APP_SLUG;
+  audience: string;
   portalUrl: URL;
   publicUrl: URL;
   autoCreateUsers: boolean;
@@ -70,8 +69,8 @@ function loadConfig(): PortalSsoConfig {
   }
 
   const audience = requiredEnvironment("PORTAL_SSO_AUDIENCE");
-  if (audience !== REQUIRED_APP_SLUG) {
-    throw new Error(`PORTAL_SSO_AUDIENCE must be exactly ${REQUIRED_APP_SLUG}.`);
+  if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(audience)) {
+    throw new Error("PORTAL_SSO_AUDIENCE must be a valid lowercase app slug.");
   }
 
   const ttl = Number.parseInt(process.env.PORTAL_SESSION_TTL_HOURS || "12", 10);
@@ -82,7 +81,7 @@ function loadConfig(): PortalSsoConfig {
   return {
     secret,
     issuer: REQUIRED_ISSUER,
-    audience: REQUIRED_APP_SLUG,
+    audience,
     portalUrl: parseHttpsUrl(requiredEnvironment("PORTAL_URL"), "PORTAL_URL"),
     publicUrl: parseHttpsUrl(
       requiredEnvironment("APP_PUBLIC_URL"),

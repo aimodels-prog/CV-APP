@@ -5,8 +5,8 @@ The application uses VIA Portal as its only interactive login. There is no local
 ## Portal registration
 
 ```text
-App slug: via-cv
-Audience: via-cv
+App slug: via-cv-generation
+Audience: via-cv-generation
 Issuer: via-portal
 Callback/dashboard path: /dashboard
 Production callback: https://<app-domain>/dashboard
@@ -19,7 +19,7 @@ The portal may return a user to any application path supplied in `returnTo`. The
 ```text
 PORTAL_SSO_SECRET=<same strong secret configured in VIA Portal>
 PORTAL_SSO_ISSUER=via-portal
-PORTAL_SSO_AUDIENCE=via-cv
+PORTAL_SSO_AUDIENCE=via-cv-generation
 PORTAL_URL=https://portal.via-int.com
 APP_PUBLIC_URL=https://<app-domain>
 PORTAL_SSO_AUTO_CREATE_USERS=true
