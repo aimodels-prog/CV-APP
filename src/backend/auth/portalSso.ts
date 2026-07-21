@@ -34,7 +34,6 @@ interface PortalSsoConfig {
   issuer: typeof REQUIRED_ISSUER;
   audience: string;
   portalUrl: URL;
-  publicUrl: URL;
   autoCreateUsers: boolean;
   sessionTtlHours: number;
   secureCookies: boolean;
@@ -83,10 +82,6 @@ function loadConfig(): PortalSsoConfig {
     issuer: REQUIRED_ISSUER,
     audience,
     portalUrl: parseHttpsUrl(requiredEnvironment("PORTAL_URL"), "PORTAL_URL"),
-    publicUrl: parseHttpsUrl(
-      requiredEnvironment("APP_PUBLIC_URL"),
-      "APP_PUBLIC_URL",
-    ),
     autoCreateUsers:
       process.env.PORTAL_SSO_AUTO_CREATE_USERS?.trim().toLowerCase() !== "false",
     sessionTtlHours,
@@ -207,31 +202,6 @@ function cleanCallbackPath(req: Request): string {
   const url = new URL(req.originalUrl, "https://local.invalid");
   url.searchParams.delete("portal_token");
   return `${url.pathname}${url.search}` || "/";
-}
-
-function appReturnUrl(req: Request, config: PortalSsoConfig): URL {
-  const requested = typeof req.query.returnTo === "string" ? req.query.returnTo : "";
-  if (requested.startsWith("/") && !requested.startsWith("//")) {
-    return new URL(requested, config.publicUrl);
-  }
-  if (requested) {
-    try {
-      const candidate = new URL(requested);
-      if (candidate.origin === config.publicUrl.origin) return candidate;
-    } catch {
-      // Fall back to the current app page.
-    }
-  }
-  if (req.originalUrl.startsWith("/api/auth/login")) {
-    return new URL("/dashboard", config.publicUrl);
-  }
-  return new URL(cleanCallbackPath(req), config.publicUrl);
-}
-
-function portalLoginUrl(returnTo: URL, config: PortalSsoConfig): string {
-  const login = new URL("/auth/google", config.portalUrl);
-  login.searchParams.set("returnTo", returnTo.toString());
-  return login.toString();
 }
 
 async function findOrCreateUser(
@@ -415,7 +385,7 @@ export function createPortalSso(pool: Pool) {
       if (req.path.startsWith("/api/")) {
         return res.status(401).json({ error: { code: "AUTH_REQUIRED", message: "VIA Portal authentication is required." } });
       }
-      res.redirect(302, portalLoginUrl(appReturnUrl(req, config), config));
+      res.redirect(302, config.portalUrl.toString());
     })().catch((error) => {
       console.error("VIA Portal session validation failed:", error);
       res.status(500).json({ error: { code: "SESSION_ERROR", message: "The VIA session could not be validated." } });
@@ -424,7 +394,7 @@ export function createPortalSso(pool: Pool) {
 
   router.get("/login", (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    res.redirect(302, portalLoginUrl(appReturnUrl(req, config), config));
+    res.redirect(302, config.portalUrl.toString());
   });
   router.get("/me", (req, res) => {
     res.setHeader("Cache-Control", "no-store");

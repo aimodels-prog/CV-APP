@@ -1,6 +1,6 @@
 # VIA Portal SSO
 
-The application uses VIA Portal as its only interactive login. There is no local username/password login for VIA staff.
+The application uses VIA Portal as its only interactive login. There is no local username/password login for VIA staff. An unauthenticated direct visit stops at the VIA Portal homepage; the user opens the CV Tool from its Portal tile after signing in.
 
 ## Portal registration
 
@@ -12,7 +12,7 @@ Callback/dashboard path: /dashboard
 Production callback: https://<app-domain>/dashboard
 ```
 
-The portal may return a user to any application path supplied in `returnTo`. The server consumes `portal_token` on that path, creates the local session, and redirects to the same path without the token query parameter.
+The portal may return an authorized user to any application path with `portal_token`. The server consumes the token on that path, creates the local session, and redirects to the same path without the token query parameter.
 
 ## Runtime environment
 
@@ -21,12 +21,11 @@ PORTAL_SSO_SECRET=<same strong secret configured in VIA Portal>
 PORTAL_SSO_ISSUER=via-portal
 PORTAL_SSO_AUDIENCE=via-cv-generation
 PORTAL_URL=https://portal.via-int.com
-APP_PUBLIC_URL=https://<app-domain>
 PORTAL_SSO_AUTO_CREATE_USERS=true
 PORTAL_SESSION_TTL_HOURS=12
 ```
 
-On DigitalOcean App Platform, `APP_PUBLIC_URL` can use the `${APP_URL}` bindable value until a custom domain is assigned. Store `PORTAL_SSO_SECRET` as an encrypted run-time variable. Never expose it through a `VITE_` variable.
+Store `PORTAL_SSO_SECRET` as an encrypted run-time variable. Never expose it through a `VITE_` variable.
 
 ## Security behavior
 

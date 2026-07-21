@@ -70,7 +70,6 @@ async function run() {
   process.env.PORTAL_SSO_ISSUER = "via-portal";
   process.env.PORTAL_SSO_AUDIENCE = "via-cv-generation";
   process.env.PORTAL_URL = "https://portal.via-int.com";
-  process.env.APP_PUBLIC_URL = "https://cv.example.com";
 
   const database = new FakeDatabase();
   const sso = createPortalSso(database as any);
@@ -91,8 +90,8 @@ async function run() {
     assert.equal(direct.status, 302);
     const portalRedirect = new URL(direct.headers.get("location") || "");
     assert.equal(portalRedirect.origin, "https://portal.via-int.com");
-    assert.equal(portalRedirect.pathname, "/auth/google");
-    assert.equal(portalRedirect.searchParams.get("returnTo"), "https://cv.example.com/dashboard");
+    assert.equal(portalRedirect.pathname, "/");
+    assert.equal(portalRedirect.search, "");
 
     const now = Math.floor(Date.now() / 1000);
     const basePayload = {
