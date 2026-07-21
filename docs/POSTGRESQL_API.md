@@ -38,7 +38,7 @@ Reference values can be submitted using either their stable code or displayed la
 | Matches | list/filter, transactional bulk save, update, delete |
 | Generated CVs | list, create, update, delete |
 | Branding profiles | list, create, update, delete |
-| Users | list, create, update, delete |
+| Users | administrator-only list and emergency local enable/disable; provisioning is handled by VIA Portal |
 | Activity logs | list |
 | Settings | get and upsert |
 | User preferences | get and upsert |
@@ -74,7 +74,7 @@ Validated on 2026-07-20 using PostgreSQL 18.3:
 - match create/read;
 - generated CV create/read;
 - branding create/read;
-- user create/read;
+- portal-linked user read and local access-state controls;
 - settings and preferences round-trips;
 - dashboard statistics;
 - strict TypeScript check and production build.

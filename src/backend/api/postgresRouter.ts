@@ -7,6 +7,7 @@ import {
   boundedInteger,
   HttpError,
   optionalString,
+  requireAdminAccess,
   requireObject,
   requireString,
   requireWriteAccess,
@@ -178,6 +179,24 @@ function normalizeReferenceCode(value: string): string {
   return code;
 }
 
+const ADMIN_MANAGED_SETTING_KEYS = new Set([
+  "ai-settings",
+  "google-drive",
+  "hidden-modules",
+]);
+
+function requireAdminForManagedSetting(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  if (ADMIN_MANAGED_SETTING_KEYS.has(req.params.key)) {
+    requireAdminAccess(req, res, next);
+    return;
+  }
+  next();
+}
+
 export function createPostgresApiRouter(pool: Pool) {
   const router = express.Router();
 
@@ -312,7 +331,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.post(
     "/reference-data/:groupCode/values",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const body = requireObject(req.body);
       const groupCode = req.params.groupCode;
@@ -343,7 +362,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.patch(
     "/reference-data/:groupCode/values/:code",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const body = requireObject(req.body);
       const result = await pool.query(
@@ -381,7 +400,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.delete(
     "/reference-data/:groupCode/values/:code",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const result = await pool.query(
         `
@@ -417,7 +436,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.post(
     "/taxonomy",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const body = requireObject(req.body);
       const label = requireString(body.label, "label", 200);
@@ -450,7 +469,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.patch(
     "/taxonomy/:code",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const body = requireObject(req.body);
       const result = await pool.query(
@@ -489,7 +508,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.delete(
     "/taxonomy/:code",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const result = await pool.query(
         `UPDATE position_taxonomy SET is_active = FALSE
@@ -1194,7 +1213,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.post(
     "/brandings",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const branding = requireObject(req.body);
       const name = requireString(branding.name, "name", 500);
@@ -1216,7 +1235,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.patch(
     "/brandings/:id",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const updates = requireObject(req.body);
       const result = await pool.query(
@@ -1241,7 +1260,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.delete(
     "/brandings/:id",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const result = await pool.query(
         `DELETE FROM brandings WHERE id = $1 RETURNING id`,
@@ -1261,6 +1280,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.get(
     "/users",
+    requireAdminAccess,
     asyncRoute(async (_req, res) => {
       const result = await pool.query(
         `SELECT * FROM users ORDER BY created_at DESC`,
@@ -1271,95 +1291,80 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.post(
     "/users",
-    requireWriteAccess,
-    asyncRoute(async (req, res) => {
-      const user = requireObject(req.body);
-      const role = await resolveReferenceCode(
-        pool,
-        "user_role",
-        user.role || "STAFF",
-      );
-      const status = await resolveReferenceCode(
-        pool,
-        "user_status",
-        user.status || "INVITED",
-      );
-      const data = { ...user, role: user.role || "Staff", status: user.status || "Invited" };
-      const result = await pool.query(
-        `
-          INSERT INTO users (id, name, email, role_code, status_code, data)
-          VALUES ($1, $2, $3, $4, $5, $6::JSONB)
-          RETURNING *
-        `,
-        [
-          optionalString(user.id) || uuidv4(),
-          requireString(user.name, "name", 500),
-          requireString(user.email, "email", 500).toLowerCase(),
-          role,
-          status,
-          JSON.stringify(data),
-        ],
-      );
-      await addActivityLog(
-        pool,
-        "User Added",
-        `Added user ${result.rows[0].email}`,
-      );
-      res.status(201).json(userFromRow(result.rows[0]));
-    }),
+    requireAdminAccess,
+    (_req, _res, next) =>
+      next(
+        new HttpError(
+          405,
+          "PORTAL_MANAGED_USERS",
+          "Users are provisioned through VIA Portal and cannot be added manually.",
+        ),
+      ),
   );
 
   router.patch(
     "/users/:id",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const updates = requireObject(req.body);
-      const role = updates.role
-        ? await resolveReferenceCode(pool, "user_role", updates.role)
-        : null;
-      const status = updates.status
-        ? await resolveReferenceCode(pool, "user_status", updates.status)
-        : null;
+      const status = await resolveReferenceCode(
+        pool,
+        "user_status",
+        requireString(updates.status, "status", 100),
+      );
+      if (status !== "ACTIVE" && status !== "DISABLED") {
+        throw new HttpError(
+          400,
+          "INVALID_USER_STATUS",
+          "A portal-managed user can only be active or disabled locally.",
+        );
+      }
+      const actingUser = res.locals.portalUser as { id?: string } | undefined;
+      if (status === "DISABLED" && actingUser?.id === req.params.id) {
+        throw new HttpError(
+          400,
+          "CANNOT_DISABLE_SELF",
+          "Administrators cannot disable their own active session.",
+        );
+      }
       const result = await pool.query(
         `
           UPDATE users SET
-            name = COALESCE($2, name),
-            email = COALESCE($3, email),
-            role_code = COALESCE($4, role_code),
-            status_code = COALESCE($5, status_code),
-            data = data || $6::JSONB
-          WHERE id = $1 RETURNING *
+            status_code = $2,
+            data = data || $3::JSONB,
+            updated_at = NOW()
+          WHERE id = $1
+          RETURNING *
         `,
         [
           req.params.id,
-          optionalString(updates.name),
-          optionalString(updates.email)?.toLowerCase() || null,
-          role,
           status,
-          JSON.stringify(updates),
+          JSON.stringify({ status: status === "ACTIVE" ? "Active" : "Disabled" }),
         ],
       );
       if (!result.rowCount) {
         throw new HttpError(404, "NOT_FOUND", "User not found.");
       }
+      await addActivityLog(
+        pool,
+        status === "ACTIVE" ? "ENABLE_USER" : "DISABLE_USER",
+        `${status === "ACTIVE" ? "Enabled" : "Disabled"} ${result.rows[0].email}`,
+      );
       res.json(userFromRow(result.rows[0]));
     }),
   );
 
   router.delete(
     "/users/:id",
-    requireWriteAccess,
-    asyncRoute(async (req, res) => {
-      const result = await pool.query(
-        `DELETE FROM users WHERE id = $1 RETURNING id`,
-        [req.params.id],
-      );
-      if (!result.rowCount) {
-        throw new HttpError(404, "NOT_FOUND", "User not found.");
-      }
-      await addActivityLog(pool, "User Deleted", "Deleted user record");
-      res.json({ success: true });
-    }),
+    requireAdminAccess,
+    (_req, _res, next) =>
+      next(
+        new HttpError(
+          405,
+          "PORTAL_MANAGED_USERS",
+          "Portal-managed users cannot be deleted. Revoke access in VIA Portal or disable the local account.",
+        ),
+      ),
   );
 
   router.get(
@@ -1414,6 +1419,7 @@ export function createPostgresApiRouter(pool: Pool) {
 
   router.put(
     "/settings/:key",
+    requireAdminForManagedSetting,
     requireWriteAccess,
     asyncRoute(async (req, res) => {
       const body = requireObject(req.body);

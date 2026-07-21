@@ -7,6 +7,7 @@ import { createPostgresPool } from "./postgres.ts";
 
 dotenv.config();
 process.env.NODE_ENV = "test";
+process.env.API_ADMIN_TOKEN = "integration-admin-token";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -31,6 +32,7 @@ async function runApiIntegrationTest() {
       ...init,
       headers: {
         "content-type": "application/json",
+        "x-admin-token": "integration-admin-token",
         ...(init?.headers || {}),
       },
     });
@@ -296,17 +298,41 @@ async function runApiIntegrationTest() {
     });
     assert(branding.name === "Integration Branding", "Branding save failed.");
 
-    const user = await request("/users", {
+    const unauthorisedUsers = await fetch(`${baseUrl}/users`, {
+      headers: { "content-type": "application/json" },
+    });
+    assert(
+      unauthorisedUsers.status === 403,
+      "User administration did not require administrator access.",
+    );
+
+    const manualUser = await fetch(`${baseUrl}/users`, {
       method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-admin-token": "integration-admin-token",
+      },
       body: JSON.stringify({
-        id: "integration-user-1",
-        name: "Integration User",
-        email: "integration@example.com",
-        role: "Admin",
-        status: "Active",
+        name: "Manual User",
+        email: "manual@via-int.com",
       }),
     });
-    assert(user.email === "integration@example.com", "User save failed.");
+    assert(
+      manualUser.status === 405,
+      "Manual user provisioning was not blocked.",
+    );
+
+    await pool.query(
+      `INSERT INTO users (id, name, email, role_code, status_code, data)
+       VALUES ('integration-user-1', 'Integration User', 'integration@via-int.com', 'ADMIN', 'ACTIVE', $1::JSONB)
+       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name`,
+      [JSON.stringify({ role: "Admin", status: "Active", ssoProvider: "via-portal" })],
+    );
+    const users = await request("/users");
+    assert(
+      users.some((user: any) => user.email === "integration@via-int.com"),
+      "Portal-linked user read failed.",
+    );
 
     await request("/settings/integration.setting", {
       method: "PUT",

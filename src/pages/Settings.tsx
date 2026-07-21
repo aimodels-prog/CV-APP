@@ -23,7 +23,9 @@ export default function Settings() {
   const { values } = useReferenceData();
   const moduleOptions = values('app_module');
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'integrations');
+  const [activeTab, setActiveTab] = useState('profile');
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const isAdmin = currentUser?.localRole === 'ADMIN';
   const [folderId, setFolderId] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [isSaved, setIsSaved] = useState(false);
@@ -37,10 +39,6 @@ export default function Settings() {
     setBrandings(data);
   };
   
-  useEffect(() => {
-    loadBrandings();
-  }, []);
-
   const handleCreateBranding = async () => {
     if (!newBranding.name) return;
     await api.createBranding(newBranding);
@@ -59,65 +57,61 @@ export default function Settings() {
   const [taxonomy, setTaxonomy] = useState<string[]>([]);
   const [newTaxonomy, setNewTaxonomy] = useState('');
   
-  const [profile, setProfile] = useState({
-    fullName: 'VIA User',
-    email: '',
-    organization: 'Tender & Bidding Operations',
-    avatar: ''
-  });
   const [hiddenModules, setHiddenModules] = useState<string[]>(['matches', 'generated-cvs']);
 
   useEffect(() => {
     async function load() {
-      const config = await api.getGoogleDriveSettings();
+      const user = await api.getCurrentUser();
+      setCurrentUser(user);
+      if (user.localRole !== 'ADMIN') {
+        setActiveTab('profile');
+        setLoading(false);
+        return;
+      }
+
+      const [config, tax, savedModules, health] = await Promise.all([
+        api.getGoogleDriveSettings(),
+        api.getTaxonomy(),
+        api.getAppSetting('hidden-modules', ['matches', 'generated-cvs']),
+        api.health(),
+        loadBrandings(),
+      ]);
       if (config) {
         setFolderId(config.folderId || '');
         setApiKey(config.apiKey ? '***' : '');
       }
-      const tax = await api.getTaxonomy();
       setTaxonomy(tax);
-
-      setLoading(false);
-      
-      const [savedProfile, savedModules, health, currentUser] = await Promise.all([
-        api.getAppSetting('profile-settings', null),
-        api.getAppSetting('hidden-modules', ['matches', 'generated-cvs']),
-        api.health(),
-        api.getCurrentUser(),
-      ]);
-      setProfile((current) => ({
-        ...current,
-        ...(savedProfile || {}),
-        fullName: currentUser.name,
-        email: currentUser.email,
-      }));
       if (Array.isArray(savedModules)) setHiddenModules(savedModules);
       setDatabaseHealth(health);
+      setLoading(false);
     }
-    load();
+    void load();
   }, []);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab) {
+    const adminTabs = new Set(['taxonomy', 'users', 'branding', 'integrations', 'modules', 'data-backup']);
+    if (tab && (!adminTabs.has(tab) || isAdmin)) {
       setActiveTab(tab);
+    } else if (tab && currentUser) {
+      setActiveTab('profile');
     }
-  }, [searchParams]);
+  }, [searchParams, isAdmin, currentUser]);
 
-  const handleTabChange = (tab: string) => {
-     setActiveTab(tab);
-  };
-
-  const handleSave = async () => {
+  const handleSaveIntegration = async () => {
     const config = await api.getGoogleDriveSettings();
     const newConfig = {
       folderId,
       apiKey: apiKey === '***' ? config.apiKey : apiKey
     };
     await api.saveGoogleDriveSettings(newConfig);
-    
+
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 3000);
+  };
+
+  const handleSaveTaxonomy = async () => {
     await api.saveTaxonomy(taxonomy);
-    
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -131,12 +125,6 @@ export default function Settings() {
 
   const removeTaxonomy = (index: number) => {
     setTaxonomy(taxonomy.filter((_, i) => i !== index));
-  };
-
-  const handleSaveProfile = async () => {
-    await api.saveAppSetting('profile-settings', profile);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
   };
 
   const toggleModule = async (moduleName: string) => {
@@ -173,19 +161,10 @@ export default function Settings() {
                 }`}
               >
                 <User size={16} />
-                Profile
+                My Account
               </button>
-              <button 
-                onClick={() => setActiveTab('security')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'security' 
-                    ? 'bg-blue-50 text-blue-600' 
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                }`}
-              >
-                <ShieldCheck size={16} />
-                Security
-              </button>
+              {isAdmin && (
+                <>
               <button 
                 onClick={() => setActiveTab('taxonomy')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -254,13 +233,15 @@ export default function Settings() {
                 <DatabaseBackup size={16} />
                 Database
               </button>
+                </>
+              )}
             </div>
           </div>
         </div>
 
         {/* Main Content */}
         <div className="flex-1">
-          {activeTab === 'data-backup' && (
+          {isAdmin && activeTab === 'data-backup' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
               <div className="max-w-3xl">
                 <h3 className="text-lg font-semibold text-slate-900">PostgreSQL Database</h3>
@@ -277,7 +258,7 @@ export default function Settings() {
             </div>
           )}
 
-          {activeTab === 'modules' && (
+          {isAdmin && activeTab === 'modules' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
               <div className="flex items-start justify-between mb-6">
                 <div>
@@ -311,7 +292,7 @@ export default function Settings() {
           )}
 
           
-          {activeTab === 'branding' && (
+          {isAdmin && activeTab === 'branding' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
               <div className="flex items-start justify-between mb-6">
                 <div>
@@ -463,13 +444,13 @@ export default function Settings() {
             </div>
           )}
 
-          {activeTab === 'users' && (
+          {isAdmin && activeTab === 'users' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 overflow-hidden">
-               <UsersComponent />
+               <UsersComponent currentUserId={currentUser?.id} />
             </div>
           )}
 
-          {activeTab === 'integrations' && (
+          {isAdmin && activeTab === 'integrations' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
               <div className="flex items-start justify-between mb-6">
                 <div>
@@ -477,7 +458,7 @@ export default function Settings() {
                   <p className="text-sm text-slate-500 mt-1">Configure Google Drive settings for automated CV ingestion</p>
                 </div>
                 <button 
-                  onClick={handleSave}
+                  onClick={handleSaveIntegration}
                   className="flex items-center gap-2 px-4 py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
                 >
                   {isSaved ? <CheckCircle2 size={16} /> : <Save size={16} />}
@@ -502,11 +483,11 @@ export default function Settings() {
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Google Drive Service Account JSON</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Google Drive API Key</label>
                       <textarea 
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="Paste API Key or Service Account JSON here..."
+                        placeholder="Paste a Google Drive API key..."
                         className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500 transition-colors font-mono min-h-[100px]"
                       />
                       <div className="mt-2 text-sm">
@@ -517,7 +498,7 @@ export default function Settings() {
                           </summary>
                           <div className="p-4 space-y-4 text-slate-600 text-xs">
                             <div>
-                              <h4 className="font-bold text-slate-800 mb-1">Option 1: API Key (For Public Folders)</h4>
+                              <h4 className="font-bold text-slate-800 mb-1">API Key for a read-only shared folder</h4>
                               <ol className="list-decimal list-inside space-y-1 ml-1">
                                 <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Google Cloud Console</a>.</li>
                                 <li>Enable the <strong>Google Drive API</strong>.</li>
@@ -525,16 +506,7 @@ export default function Settings() {
                                 <li>Ensure your Google Drive folder's sharing settings are set to <strong>"Anyone with the link can view"</strong>.</li>
                               </ol>
                             </div>
-                            <div>
-                              <h4 className="font-bold text-slate-800 mb-1">Option 2: Service Account JSON (For Private Folders - Recommended)</h4>
-                              <ol className="list-decimal list-inside space-y-1 ml-1">
-                                <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Google Cloud Console</a> &gt; Credentials.</li>
-                                <li>Click <strong>Create Credentials</strong> &gt; <strong>Service Account</strong>.</li>
-                                <li>Go to the new Service Account &gt; <strong>Keys</strong> tab &gt; <strong>Add Key</strong> &gt; <strong>JSON</strong>.</li>
-                                <li>Open the downloaded JSON file and paste its ENTIRE contents here.</li>
-                                <li><strong>Important:</strong> Copy the Service Account's email address and <strong>Share your Google Drive CV folder</strong> with that email.</li>
-                              </ol>
-                            </div>
+                            <p>Restrict the key to the Google Drive API and this application domain. The current integration supports API-key access to a read-only shared folder; it does not accept service-account JSON.</p>
                           </div>
                         </details>
                       </div>
@@ -545,7 +517,7 @@ export default function Settings() {
             </div>
           )}
 
-          {activeTab === 'taxonomy' && (
+          {isAdmin && activeTab === 'taxonomy' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
               <div className="flex items-start justify-between mb-6">
                 <div>
@@ -553,7 +525,7 @@ export default function Settings() {
                   <p className="text-sm text-slate-500 mt-1">Configure global standard disciplines mapped during AI processing</p>
                 </div>
                 <button 
-                  onClick={handleSave}
+                  onClick={handleSaveTaxonomy}
                   className="flex items-center gap-2 px-4 py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
                 >
                   {isSaved ? <CheckCircle2 size={16} /> : <Save size={16} />}
@@ -594,96 +566,35 @@ export default function Settings() {
 
           {activeTab === 'profile' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-              <div className="flex items-start justify-between mb-6">
+              <div className="mb-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Profile Settings</h3>
-                  <p className="text-sm text-slate-500 mt-1">Manage your professional information and preferences</p>
-                </div>
-                <button 
-                  onClick={handleSaveProfile}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
-                >
-                  {isSaved ? <CheckCircle2 size={16} /> : <Save size={16} />}
-                  {isSaved ? 'Saved' : 'Save Profile'}
-                </button>
-              </div>
-              <div className="max-w-2xl space-y-6">
-                <div className="flex items-center gap-6">
-                  <div className="w-20 h-20 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-2xl font-bold uppercase overflow-hidden">
-                    {profile.avatar ? (
-                      <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      profile.fullName.substring(0, 2) || 'UN'
-                    )}
-                  </div>
-                  <label className="cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm">
-                    Change Avatar
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      className="hidden" 
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setProfile({...profile, avatar: reader.result as string});
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Full Name</label>
-                    <input 
-                      type="text" 
-                      value={profile.fullName}
-                      readOnly
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Email Address</label>
-                    <input 
-                      type="email" 
-                      value={profile.email}
-                      readOnly
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
-                    />
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Organization / Department</label>
-                    <input 
-                      type="text" 
-                      value={profile.organization}
-                      onChange={e => setProfile({...profile, organization: e.target.value})}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                    />
-                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900">My Account</h3>
+                  <p className="text-sm text-slate-500 mt-1">Your identity and access are managed by VIA Portal and Google Workspace.</p>
                 </div>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'security' && (
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Security Settings</h3>
-                  <p className="text-sm text-slate-500 mt-1">Manage your credentials and access permissions</p>
+              <div className="max-w-2xl space-y-5">
+                <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-bold uppercase text-blue-700">
+                    {(currentUser?.name || 'VIA User').split(' ').map((part: string) => part[0]).join('').slice(0, 2)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900">{currentUser?.name || 'Loading VIA identity...'}</p>
+                    <p className="truncate text-sm text-slate-500">{currentUser?.email || ''}</p>
+                    <span className="mt-2 inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
+                      {currentUser?.localRole === 'ADMIN' ? 'Administrator' : 'Staff'}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="max-w-2xl">
                 <div className="flex gap-4 rounded-lg border border-blue-100 bg-blue-50 p-5">
                   <ShieldCheck className="mt-0.5 shrink-0 text-blue-700" size={22} />
                   <div>
                     <h4 className="text-sm font-semibold text-slate-900">Managed by VIA Portal</h4>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Authentication and password security are managed through VIA Google Workspace. This application never receives or stores your Google password.
+                      Authentication, passwords, application access, and identity details are controlled through VIA Google Workspace. This application never receives or stores your Google password.
                     </p>
+                    <a href="https://portal.via-int.com" className="mt-3 inline-flex text-sm font-semibold text-blue-700 hover:text-blue-800">
+                      Open VIA Portal
+                    </a>
                   </div>
                 </div>
               </div>

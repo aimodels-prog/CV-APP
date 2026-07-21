@@ -132,13 +132,6 @@ export const postgresApi = {
   getStats: () => request("/stats"),
   getLogs: () => request<any[]>("/activity-logs"),
   getUsers: () => request<any[]>("/users"),
-  addUser: async (user: any) => {
-    const created = await request("/users", {
-      method: "POST",
-      body: JSON.stringify(user),
-    });
-    return { success: true, user: created };
-  },
   updateUser: async (id: string, updates: any) => {
     await request(`/users/${encodeURIComponent(id)}`, {
       method: "PATCH",
@@ -146,9 +139,6 @@ export const postgresApi = {
     });
     return { success: true };
   },
-  deleteUser: async (id: string) =>
-    request(`/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
-
   getExperts: () => request<any[]>("/experts"),
   getTenders: () => request<any[]>("/tenders"),
   getTender: async (id: string) => {

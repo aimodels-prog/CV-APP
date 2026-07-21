@@ -29,7 +29,10 @@ export async function downloadAndParseGoogleDriveCV(file: any, apiKey: string) {
 }
 
 export async function syncGoogleDriveInBackground(addTask: any, updateTask: any) {
-  const config = await api.getGoogleDriveSettings();
+  const [config, savedProcessedIds] = await Promise.all([
+    api.getGoogleDriveSettings(),
+    api.getAppSetting<string[]>('google-drive-processed-ids', []),
+  ]);
   if (!config || !config.folderId || !config.apiKey || config.apiKey === '***') return;
 
   try {
@@ -39,7 +42,7 @@ export async function syncGoogleDriveInBackground(addTask: any, updateTask: any)
 
     const data = await response.json();
     const files = data.files || [];
-    const processedIds = config.processedIds || [];
+    const processedIds = Array.isArray(savedProcessedIds) ? [...savedProcessedIds] : [];
     
     // Find new files
     const newFiles = files.filter((f: any) => !processedIds.includes(f.id));
@@ -60,7 +63,7 @@ export async function syncGoogleDriveInBackground(addTask: any, updateTask: any)
           message: `Processed ${currentProcessed} of ${newFiles.length} files`
         });
         processedIds.push(f.id);
-        await api.saveGoogleDriveSettings({ ...config, processedIds });
+        await api.saveAppSetting('google-drive-processed-ids', processedIds);
       }
 
       updateTask(taskId, {

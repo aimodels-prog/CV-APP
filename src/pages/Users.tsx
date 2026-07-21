@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, Mail, Trash2, Edit, ChevronDown, ChevronUp, ArrowUpAZ, ArrowDownZA } from 'lucide-react';
+import { Search, Filter, ShieldCheck, ShieldOff, ChevronDown, ChevronUp, ArrowUpAZ, ArrowDownZA } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../lib/api';
 import ConfirmModal from '../components/ConfirmModal';
-import PromptModal from '../components/PromptModal';
 
-export default function Users() {
+export default function Users({ currentUserId }: { currentUserId?: string }) {
   const [users, setUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [resendEmail, setResendEmail] = useState<string | null>(null);
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [editUser, setEditUser] = useState<any | null>(null);
+  const [accessChangeUser, setAccessChangeUser] = useState<any | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [activeColumnMenu, setActiveColumnMenu] = useState<string | null>(null);
@@ -20,13 +16,7 @@ export default function Users() {
 
   const fetchUsers = async () => {
     const data = await api.getUsers();
-    if (data.length === 0) {
-        await api.addUser({ name: 'Admin User', email: 'admin@example.com', role: 'Admin', status: 'Active', lastLogin: new Date().toISOString() });
-        const initialData = await api.getUsers();
-        setUsers(initialData);
-    } else {
-        setUsers(data);
-    }
+    setUsers(data);
   };
 
   useEffect(() => {
@@ -172,13 +162,12 @@ export default function Users() {
           <p className="text-slate-500 text-sm">Manage access and permissions for your team members</p>
         </div>
         
-        <button 
-          onClick={() => setIsInviteOpen(true)}
+        <a
+          href="https://portal.via-int.com"
           className="flex items-center gap-2 bg-[#004b87] hover:bg-blue-800 text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm"
         >
-          <Plus size={16} />
-          Add User
-        </button>
+          Manage Access in VIA Portal
+        </a>
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -243,14 +232,21 @@ export default function Users() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setEditUser(user)} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors" title="Edit User">
-                          <Edit size={16} />
-                        </button>
-                        <button onClick={() => setResendEmail(user.email)} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors" title="Resend Invite">
-                          <Mail size={16} />
-                        </button>
-                        <button onClick={() => setConfirmDeleteId(user.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors" title="Remove User">
-                          <Trash2 size={16} />
+                        <button
+                          onClick={() => setAccessChangeUser(user)}
+                          disabled={user.id === currentUserId}
+                          className={clsx(
+                            "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                            user.id === currentUserId
+                              ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                              : user.status === 'Disabled'
+                                ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                                : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
+                          )}
+                          title={user.id === currentUserId ? 'Your active VIA account' : user.status === 'Disabled' ? 'Enable local access' : 'Disable local access'}
+                        >
+                          {user.id === currentUserId || user.status === 'Disabled' ? <ShieldCheck size={14} /> : <ShieldOff size={14} />}
+                          {user.id === currentUserId ? 'Current User' : user.status === 'Disabled' ? 'Enable' : 'Disable'}
                         </button>
                       </div>
                     </td>
@@ -269,70 +265,22 @@ export default function Users() {
       </div>
 
       <ConfirmModal
-        isOpen={!!confirmDeleteId}
-        title="Remove User"
-        message="Are you sure you want to remove this user from the organization? They will immediately lose access."
-        confirmText="Remove User"
-        isDestructive={true}
+        isOpen={!!accessChangeUser}
+        title={accessChangeUser?.status === 'Disabled' ? 'Enable Local Access' : 'Disable Local Access'}
+        message={accessChangeUser?.status === 'Disabled'
+          ? `Allow ${accessChangeUser?.email || 'this user'} to create a new local session when VIA Portal grants access?`
+          : `Block ${accessChangeUser?.email || 'this user'} from this application even if VIA Portal grants access?`}
+        confirmText={accessChangeUser?.status === 'Disabled' ? 'Enable Access' : 'Disable Access'}
+        isDestructive={accessChangeUser?.status !== 'Disabled'}
         onConfirm={async () => {
-          if (confirmDeleteId) {
-            await api.deleteUser(confirmDeleteId);
-            setConfirmDeleteId(null);
-            fetchUsers();
-          }
+          if (!accessChangeUser) return;
+          await api.updateUser(accessChangeUser.id, {
+            status: accessChangeUser.status === 'Disabled' ? 'Active' : 'Disabled',
+          });
+          setAccessChangeUser(null);
+          await fetchUsers();
         }}
-        onCancel={() => setConfirmDeleteId(null)}
-      />
-
-      <ConfirmModal
-        isOpen={!!resendEmail}
-        title="Resend Invite"
-        message={`Would you like to resend the invitation email to ${resendEmail}?`}
-        confirmText="Resend Invite"
-        onConfirm={() => {
-          setResendEmail(null);
-          // Toast or message implementation would go here
-        }}
-        onCancel={() => setResendEmail(null)}
-      />
-
-      <PromptModal
-        isOpen={isInviteOpen}
-        title="Add User Manually"
-        fields={[
-          { name: 'name', label: 'Full Name' },
-          { name: 'email', label: 'Email Address', type: 'email' },
-          { name: 'role', label: 'Role', options: ['Admin', 'Staff', 'View'] }
-        ]}
-        confirmText="Add User"
-        onConfirm={async (values) => {
-          if (values.email) {
-            const name = values.name || values.email.split('@')[0];
-            const role = values.role || 'View';
-            await api.addUser({ name, email: values.email, role, status: 'Active' });
-            setIsInviteOpen(false);
-            fetchUsers();
-          }
-        }}
-        onCancel={() => setIsInviteOpen(false)}
-      />
-
-      <PromptModal
-        isOpen={!!editUser}
-        title="Edit User"
-        fields={[
-          { name: 'name', label: 'Full Name', defaultValue: editUser?.name },
-          { name: 'role', label: 'Role', defaultValue: editUser?.role, options: ['Admin', 'Staff', 'View'] }
-        ]}
-        confirmText="Save Changes"
-        onConfirm={async (values) => {
-          if (editUser && values.name && values.role) {
-            await api.updateUser(editUser.id, { ...editUser, name: values.name, role: values.role });
-            setEditUser(null);
-            fetchUsers();
-          }
-        }}
-        onCancel={() => setEditUser(null)}
+        onCancel={() => setAccessChangeUser(null)}
       />
     </div>
   );

@@ -120,6 +120,35 @@ export function requireWriteAccess(
   next();
 }
 
+export function requireAdminAccess(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const portalUser = res.locals.portalUser as
+    | { localRole?: string }
+    | undefined;
+  if (portalUser?.localRole === "ADMIN") {
+    next();
+    return;
+  }
+
+  const configuredToken = process.env.API_ADMIN_TOKEN?.trim();
+  const providedToken = req.header("x-admin-token")?.trim();
+  if (configuredToken && providedToken === configuredToken) {
+    next();
+    return;
+  }
+
+  next(
+    new HttpError(
+      403,
+      "ADMIN_REQUIRED",
+      "VIA Portal administrator access is required.",
+    ),
+  );
+}
+
 export function apiErrorHandler(
   error: unknown,
   _req: Request,

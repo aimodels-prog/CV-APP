@@ -17,7 +17,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ totalExperts: 0, activeTenders: 0, cvsGenerated: 0, matchRate: 0, totalMatches: 0 });
   const [tenders, setTenders] = useState<any[]>([]);
   const [matchRates, setMatchRates] = useState<Record<string, string>>({});
-  const [userName, setUserName] = useState('Admin User');
+  const [userName, setUserName] = useState('VIA User');
   const navigate = useNavigate();
 
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -26,6 +26,10 @@ export default function Dashboard() {
   const activeColumnMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    void api.getCurrentUser()
+      .then((user) => setUserName(String(user.name || 'VIA User').split(' ')[0]))
+      .catch((error) => console.error('Unable to load VIA identity:', error));
+
     const fetchData = async () => {
       try {
         const s = await api.getStats();
@@ -65,10 +69,6 @@ export default function Dashboard() {
         setTenders(latestTenders);
         setMatchRates(rates);
         
-        const savedProfile = await api.getAppSetting<any>('profile-settings', null);
-        if (savedProfile?.fullName) {
-          setUserName(savedProfile.fullName.split(' ')[0]);
-        }
       } catch (err) {
         console.error(err);
       }

@@ -45,7 +45,6 @@ export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIs
   const [profile, setProfile] = useState({
     fullName: 'VIA User',
     email: '',
-    avatar: ''
   });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hiddenModules, setHiddenModules] = useState<string[]>(['matches', 'generated-cvs']);
@@ -76,15 +75,8 @@ export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIs
 
     const loadSettings = async () => {
       try {
-        const [saved, modules] = await Promise.all([
-          api.getAppSetting('profile-settings', null),
-          api.getAppSetting('hidden-modules', ['matches', 'generated-cvs']),
-        ]);
+        const modules = await api.getAppSetting('hidden-modules', ['matches', 'generated-cvs']);
         if (cancelled) return;
-        setProfile((prev) => ({
-          ...prev,
-          avatar: saved?.avatar || prev.avatar,
-        }));
         if (Array.isArray(modules)) setHiddenModules(modules);
       } catch (error) {
         console.error('Unable to load navigation preferences:', error);
@@ -156,11 +148,7 @@ export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIs
         <div className={clsx("border-t border-slate-200 bg-white shrink-0 mt-auto flex flex-col", isCollapsed ? "p-4 gap-4 items-center" : "p-4 sm:p-5")}>
           <div className={clsx("flex items-center w-full", isCollapsed ? "justify-center" : "gap-3")}>
             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm font-medium text-slate-600 uppercase overflow-hidden shrink-0">
-              {profile.avatar ? (
-                <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                profile.fullName.substring(0, 2) || 'A'
-              )}
+              {profile.fullName.split(' ').map((part) => part[0]).join('').slice(0, 2) || 'VI'}
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden flex-1">

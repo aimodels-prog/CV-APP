@@ -6,7 +6,7 @@ import {
   asyncRoute,
   HttpError,
   requireObject,
-  requireWriteAccess,
+  requireAdminAccess,
   withTransaction,
 } from "./http.ts";
 
@@ -520,7 +520,7 @@ export function createMigrationRouter(pool: Pool) {
 
   router.post(
     "/browser-data/preview",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const parsed = snapshotFromBody(req.body);
       const preview = await previewCollections(pool, parsed.collections);
@@ -535,7 +535,7 @@ export function createMigrationRouter(pool: Pool) {
 
   router.post(
     "/browser-data/import",
-    requireWriteAccess,
+    requireAdminAccess,
     asyncRoute(async (req, res) => {
       const parsed = snapshotFromBody(req.body);
       const preview = await previewCollections(pool, parsed.collections);

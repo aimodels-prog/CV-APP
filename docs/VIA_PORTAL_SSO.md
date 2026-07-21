@@ -34,6 +34,9 @@ Store `PORTAL_SSO_SECRET` as an encrypted run-time variable. Never expose it thr
 - Portal `admin` maps to local `ADMIN`; portal `user` maps to local `STAFF`.
 - New authorized VIA users are created when auto-creation is enabled.
 - A locally disabled user remains denied.
+- Identity fields are read-only in the CV Tool. User provisioning, names, emails, roles, and primary access are managed in VIA Portal.
+- Portal administrators can view linked users and apply an emergency local enable/disable. Manual users, invitations, local passwords, and local role editing are disabled.
+- Operational settings are hidden from staff and protected by matching server-side administrator authorization.
 - The browser receives an opaque, Secure, HttpOnly, SameSite=Lax cookie. Only its SHA-256 hash is stored in PostgreSQL.
 - All application APIs and pages require the local session, except static assets, the login redirect, and the health endpoint.
 - Signing out revokes the database session and returns the user to VIA Portal.
