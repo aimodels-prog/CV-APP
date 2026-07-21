@@ -17,7 +17,24 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function useLibpqSslCompatibility(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    const sslMode = url.searchParams.get("sslmode")?.toLowerCase();
+
+    if (sslMode === "require" && !url.searchParams.has("uselibpqcompat")) {
+      url.searchParams.set("uselibpqcompat", "true");
+      return url.toString();
+    }
+  } catch {
+    // Let node-postgres report malformed connection strings consistently.
+  }
+
+  return connectionString;
+}
+
 export function createPostgresPool(): pg.Pool {
+  const rawConnectionString = requireDatabaseUrl();
   const sslOverride = process.env.DATABASE_SSL?.trim().toLowerCase();
   const caCertificate = process.env.DATABASE_CA_CERT
     ?.replace(/\\n/g, "\n")
@@ -26,16 +43,18 @@ export function createPostgresPool(): pg.Pool {
     process.env.DATABASE_SSL_REJECT_UNAUTHORIZED?.trim().toLowerCase() !==
     "false";
 
+  const connectionString = caCertificate
+    ? rawConnectionString
+    : useLibpqSslCompatibility(rawConnectionString);
+
   const ssl = caCertificate
     ? { ca: caCertificate, rejectUnauthorized }
-    : sslOverride === "true"
-      ? { rejectUnauthorized }
-      : sslOverride === "false"
-        ? false
-        : undefined;
+    : sslOverride === "false"
+      ? false
+      : undefined;
 
   return new Pool({
-    connectionString: requireDatabaseUrl(),
+    connectionString,
     max: parsePositiveInteger(process.env.DATABASE_POOL_MAX, 10),
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
