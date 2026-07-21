@@ -4,6 +4,11 @@ import { X, FileSpreadsheet, Loader2, AlertCircle, Copy, CheckCircle } from "luc
 import Papa from "papaparse";
 import { api } from "../lib/api";
 import { useTasks } from "../lib/TasksContext";
+import {
+  normalizeEducationLevel,
+  normalizeExpertType,
+  splitCommaSeparated,
+} from "../lib/expertNormalization";
 
 interface ImportExpertCsvModalProps {
   isOpen: boolean;
@@ -199,6 +204,7 @@ export function ImportExpertCsvModal({
         const result = Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
+          transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(),
         });
 
         if (result.errors.length > 0) {
@@ -218,20 +224,20 @@ export function ImportExpertCsvModal({
         email: row.email || "",
         phone: row.phone || "",
         location: row.location || "",
-        countries: typeof row.countries === 'string' ? row.countries.split(',').map((s: string) => s.trim()).filter(Boolean) : (row.countries || []),
+        countries: splitCommaSeparated(row.countries),
         dateOfBirth: row.dateOfBirth || "",
         countryOfCitizenship: row.countryOfCitizenship || row.citizenship || "",
         availability: row.availability || "",
         profileSummary: row.profileSummary || row.summary || "",
-        type: row.type || "External",
-        educationLevel: row.educationLevel || row.education || "",
+        type: normalizeExpertType(row.type),
+        educationLevel: normalizeEducationLevel(row.educationLevel || row.education),
         experienceYears: parseYears(row.experienceYears),
         languages: typeof row.languages === 'string' ? row.languages.split(',').map((s: string) => ({ name: s.trim() })).filter((l: any) => l.name) : (row.languages || []),
-        skills: typeof row.skills === 'string' ? row.skills.split(',').map((s: string) => s.trim()).filter(Boolean) : (row.skills || []),
-        software: typeof row.software === 'string' ? row.software.split(',').map((s: string) => s.trim()).filter(Boolean) : (row.software || []),
+        skills: splitCommaSeparated(row.skills),
+        software: splitCommaSeparated(row.software),
         certifications: typeof row.certifications === 'string' ? row.certifications.split(',').map((s: string) => ({ title: s.trim() })).filter((c: any) => c.title) : (row.certifications || []),
         experiences: Array.isArray(row.experiences) ? row.experiences : (typeof row.experiences === 'string' ? parseCustomList(row.experiences) : []),
-        projects: Array.isArray(row.projects) ? row.projects : [],
+        projects: Array.isArray(row.projects) ? row.projects : (typeof row.projects === 'string' ? parseCustomList(row.projects) : []),
         adequacy_experience: Array.isArray(row.adequacy_experience) ? row.adequacy_experience : (typeof row.adequacy_experience === 'string' ? parseCustomList(row.adequacy_experience) : (typeof row.adequacy === 'string' ? parseCustomList(row.adequacy) : [])),
         metadata: {
           educations: Array.isArray(row.educations) ? row.educations : (typeof row.educations === 'string' ? parseEducationList(row.educations) : []),
@@ -241,6 +247,13 @@ export function ImportExpertCsvModal({
           unmapped_data: Array.isArray(row.additional_information) ? row.additional_information : (typeof row.additional_information === 'string' ? parseAdditionalInformation(row.additional_information) : [])
         }
       }));
+
+      const missingNames = newExperts
+        .map((expert, index) => (!String(expert.fullName).trim() ? index + 1 : null))
+        .filter((index): index is number => index !== null);
+      if (missingNames.length > 0) {
+        throw new Error(`Missing fullName in CSV row${missingNames.length > 1 ? "s" : ""}: ${missingNames.join(", ")}.`);
+      }
 
       setPendingExpert(newExperts);
       setCsvText("");

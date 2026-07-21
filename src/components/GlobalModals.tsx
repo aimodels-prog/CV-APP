@@ -33,6 +33,7 @@ export function GlobalModals() {
       }
     } catch (err) {
       console.error("Failed to save tender:", err);
+      throw err;
     }
   };
 
@@ -63,6 +64,7 @@ export function GlobalModals() {
       }
     } catch (err) {
       console.error("Failed to save expert:", err);
+      throw err;
     }
   };
 

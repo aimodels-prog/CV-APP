@@ -1392,7 +1392,16 @@ export default function MatchResults() {
                    </div>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button className="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-colors">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setExpandedMatchId(isMatchExpanded ? null : match.id);
+                    }}
+                    className="text-blue-600 hover:bg-blue-100 p-1.5 rounded-lg transition-colors"
+                    aria-label={isMatchExpanded ? "Collapse candidate details" : "Expand candidate details"}
+                    aria-expanded={isMatchExpanded}
+                  >
                      <ChevronDown className={clsx("transition-transform duration-200", isMatchExpanded && "rotate-180")} size={20} />
                   </button>
                 </td>

@@ -16,7 +16,7 @@ export function ConfirmTenderModal({ tender, onSave, onCancel }: ConfirmTenderMo
     name: tender.name || tender.tender_title || '',
     internal_code: tender.internal_code || tender.tender_number || `TEN-${Math.floor(Math.random()*10000)}`,
     client: tender.client || '',
-    tender_format: tender.tender_format || 'GEN-X1',
+    tender_format: tender.tender_format || 'PDF',
     positions: tender.positions?.map((p: any) => ({ ...p })) || [],
     branding: tender.branding || { header_base64: "", footer_base64: "" }
   });
@@ -27,12 +27,13 @@ export function ConfirmTenderModal({ tender, onSave, onCancel }: ConfirmTenderMo
       name: tender.name || tender.tender_title || '',
       internal_code: tender.internal_code || tender.tender_number || `TEN-${Math.floor(Math.random()*10000)}`,
       client: tender.client || '',
-      tender_format: tender.tender_format || 'GEN-X1',
+      tender_format: tender.tender_format || 'PDF',
       positions: tender.positions?.map((p: any) => ({ ...p })) || [],
       branding: tender.branding || { header_base64: "", footer_base64: "" }
     });
   }, [tender]);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [brandings, setBrandings] = useState<any[]>([]);
   const [selectedBrandingId, setSelectedBrandingId] = useState<string>('');
 
@@ -83,8 +84,14 @@ export function ConfirmTenderModal({ tender, onSave, onCancel }: ConfirmTenderMo
       return;
     }
     setIsSaving(true);
-    await onSave(editedTender);
-    setIsSaving(false);
+    setSaveError(null);
+    try {
+      await onSave(editedTender);
+    } catch (error: any) {
+      setSaveError(error?.message || "The tender could not be saved.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -295,22 +302,29 @@ export function ConfirmTenderModal({ tender, onSave, onCancel }: ConfirmTenderMo
           </div>
 
         </div>
-        <div className="p-6 border-t border-slate-100 bg-white flex items-center justify-end gap-3">
-          <button 
-            onClick={onCancel}
-            disabled={isSaving}
-            className="px-6 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border border-slate-200"
-          >
-            Cancel
-          </button>
-          <button 
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-[#2563eb] hover:bg-blue-700 text-white transition-colors shadow-sm disabled:opacity-50"
-          >
-            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Confirm & Save Tender
-          </button>
+        <div className="p-6 border-t border-slate-100 bg-white">
+          {saveError && (
+            <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              Save failed: {saveError}
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={onCancel}
+              disabled={isSaving}
+              className="px-6 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border border-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-[#2563eb] hover:bg-blue-700 text-white transition-colors shadow-sm disabled:opacity-50"
+            >
+              {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              Confirm & Save Tender
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>

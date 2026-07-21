@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { api } from '../lib/api';
 import { translateExpertData } from '../lib/gemini';
 import { useReferenceData } from '../lib/ReferenceDataContext';
+import { normalizeEducationLevel, normalizeExpertType } from '../lib/expertNormalization';
 
 interface AddExpertModalProps {
   isOpen: boolean;
@@ -120,6 +121,7 @@ export default function AddExpertModal({ isOpen, onClose, onSuccess, initialData
   const [unmappedData, setUnmappedData] = useState<any[]>(initialData?.metadata?.unmapped_data || []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [targetLang, setTargetLang] = useState('');
 
@@ -216,6 +218,7 @@ export default function AddExpertModal({ isOpen, onClose, onSuccess, initialData
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSaveError(null);
     
     const cleanedLanguageDetails = languageDetails
       .map((language) => ({
@@ -227,6 +230,8 @@ export default function AddExpertModal({ isOpen, onClose, onSuccess, initialData
 
     const newExpert: any = {
       ...formData,
+      type: normalizeExpertType(formData.type),
+      educationLevel: normalizeEducationLevel(formData.educationLevel),
       primary_position: formData.primary_position || '',
       countries: formData.countries ? formData.countries.split(',').map(c => c.trim()).filter(Boolean) : [],
       skills: formData.skills ? formData.skills.split(',').map(s => s.trim()).filter(Boolean) : [],
@@ -265,8 +270,9 @@ export default function AddExpertModal({ isOpen, onClose, onSuccess, initialData
       if (!onSave) {
         onClose();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving expert:", error);
+      setSaveError(error?.message || "The expert could not be saved. Please review the fields and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -580,7 +586,12 @@ export default function AddExpertModal({ isOpen, onClose, onSuccess, initialData
         </div>
 
         <div className="border-t border-slate-200 p-6 bg-white flex items-center justify-between gap-3 shrink-0 rounded-b-xl shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
-          <div>
+          <div className="min-w-0 flex-1">
+            {saveError && (
+              <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                Save failed: {saveError}
+              </div>
+            )}
             {initialData?.original_cv_text && (
               <button
                 type="button"

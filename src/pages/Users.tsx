@@ -12,6 +12,7 @@ export default function Users({ currentUserId }: { currentUserId?: string }) {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [activeColumnMenu, setActiveColumnMenu] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
   const activeColumnMenuRef = useRef<HTMLDivElement>(null);
 
   const fetchUsers = async () => {
@@ -181,11 +182,43 @@ export default function Users({ currentUserId }: { currentUserId?: string }) {
             className="w-full bg-white border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
           />
         </div>
-        <button className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-medium transition-colors shadow-sm w-full sm:w-auto">
+        <button
+          type="button"
+          onClick={() => setShowFilters((visible) => !visible)}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-medium transition-colors shadow-sm w-full sm:w-auto"
+          aria-expanded={showFilters}
+        >
           <Filter size={16} />
           Filters
         </button>
       </div>
+
+      {showFilters && (
+        <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[1fr_1fr_auto]">
+          <input
+            type="text"
+            value={columnFilters.role || ''}
+            onChange={(event) => setColumnFilters((current) => ({ ...current, role: event.target.value }))}
+            placeholder="Filter by role..."
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          />
+          <input
+            type="text"
+            value={columnFilters.status || ''}
+            onChange={(event) => setColumnFilters((current) => ({ ...current, status: event.target.value }))}
+            placeholder="Filter by status..."
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          />
+          <button
+            type="button"
+            onClick={() => setColumnFilters({})}
+            disabled={Object.keys(columnFilters).length === 0}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Clear Filters
+          </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
