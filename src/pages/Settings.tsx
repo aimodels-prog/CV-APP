@@ -60,8 +60,8 @@ export default function Settings() {
   const [newTaxonomy, setNewTaxonomy] = useState('');
   
   const [profile, setProfile] = useState({
-    fullName: 'Admin User',
-    email: 'admin@via-international.com',
+    fullName: 'VIA User',
+    email: '',
     organization: 'Tender & Bidding Operations',
     avatar: ''
   });

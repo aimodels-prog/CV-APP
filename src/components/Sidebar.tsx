@@ -43,26 +43,47 @@ function SidebarItem({ to, icon: Icon, label, onClick, isCollapsed }: { to: stri
 
 export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIsOpen?: (v: boolean) => void }) {
   const [profile, setProfile] = useState({
-    fullName: 'Admin User',
-    email: 'admin@example.com',
+    fullName: 'VIA User',
+    email: '',
     avatar: ''
   });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hiddenModules, setHiddenModules] = useState<string[]>(['matches', 'generated-cvs']);
 
   useEffect(() => {
+    let identityRetry: number | undefined;
+    let cancelled = false;
+
+    const loadIdentity = async (attempt = 0) => {
+      try {
+        const currentUser = await api.getCurrentUser();
+        if (cancelled) return;
+        setProfile((prev) => ({
+          ...prev,
+          fullName: currentUser.name,
+          email: currentUser.email,
+        }));
+      } catch (error) {
+        console.error('Unable to load VIA identity:', error);
+        if (!cancelled && attempt < 4) {
+          identityRetry = window.setTimeout(
+            () => void loadIdentity(attempt + 1),
+            1000 * (attempt + 1),
+          );
+        }
+      }
+    };
+
     const loadSettings = async () => {
       try {
-        const [currentUser, saved, modules] = await Promise.all([
-          api.getCurrentUser(),
+        const [saved, modules] = await Promise.all([
           api.getAppSetting('profile-settings', null),
           api.getAppSetting('hidden-modules', ['matches', 'generated-cvs']),
         ]);
+        if (cancelled) return;
         setProfile((prev) => ({
           ...prev,
           avatar: saved?.avatar || prev.avatar,
-          fullName: currentUser.name,
-          email: currentUser.email,
         }));
         if (Array.isArray(modules)) setHiddenModules(modules);
       } catch (error) {
@@ -70,10 +91,13 @@ export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIs
       }
     };
     
-    loadSettings();
+    void loadIdentity();
+    void loadSettings();
     const handleSettingsUpdated = () => void loadSettings();
     window.addEventListener('settingsUpdated', handleSettingsUpdated);
     return () => {
+      cancelled = true;
+      if (identityRetry !== undefined) window.clearTimeout(identityRetry);
       window.removeEventListener('settingsUpdated', handleSettingsUpdated);
     };
   }, []);
