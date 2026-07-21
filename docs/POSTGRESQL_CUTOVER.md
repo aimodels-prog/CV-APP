@@ -31,6 +31,6 @@ VITE_POSTGRES_API_BASE=/api/v2
 
 ## Production safety
 
-Run migrations during deployment before starting the application. On DigitalOcean App Platform, bind `DATABASE_URL` to `${database-component.DATABASE_PRIVATE_URL}`. The connector uses libpq-compatible `sslmode=require` when no CA is supplied. For full certificate verification on supported managed clusters, also bind `DATABASE_CA_CERT` to `${database-component.CA_CERT}`. Production write endpoints also require the application's authorization boundary; do not expose `API_ADMIN_TOKEN` in frontend Vite variables.
+The server applies pending, checksum-verified migrations under a PostgreSQL advisory lock before it accepts requests. The standalone `npm run db:migrate` command remains available for controlled deployment workflows. On DigitalOcean App Platform, bind `DATABASE_URL` to `${database-component.DATABASE_PRIVATE_URL}`. The connector uses libpq-compatible `sslmode=require` when no CA is supplied. For full certificate verification on supported managed clusters, also bind `DATABASE_CA_CERT` to `${database-component.CA_CERT}`. Production write endpoints also require the application's authorization boundary; do not expose `API_ADMIN_TOKEN` in frontend Vite variables.
 
 PostgreSQL backups must be managed server-side using DigitalOcean managed-database backups or `pg_dump`. Browser backup/import controls were removed from the runtime application.

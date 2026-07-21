@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import path from "node:path";
 import multer from "multer";
 import { createPostgresPool } from "./src/backend/database/postgres.ts";
+import { runPostgresMigrations } from "./src/backend/database/migrationRunner.ts";
 import { createPostgresApiRouter } from "./src/backend/api/postgresRouter.ts";
 
 async function startServer() {
@@ -19,7 +20,7 @@ async function startServer() {
   const upload = multer({ dest: "uploads/" });
   const postgresPool = createPostgresPool();
 
-  await postgresPool.query("SELECT 1");
+  await runPostgresMigrations(postgresPool);
   app.use(express.json({ limit: "50mb" }));
   app.use("/api/v2", createPostgresApiRouter(postgresPool));
 
