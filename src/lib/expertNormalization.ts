@@ -31,3 +31,35 @@ export function splitCommaSeparated(value: unknown): string[] {
   if (typeof value !== "string") return [];
   return value.split(/[,;]/).map(clean).filter(Boolean);
 }
+
+export function normalizeDateForInput(value: unknown): string {
+  const candidate = clean(value);
+  if (!candidate) return "";
+
+  const isoMatch = candidate.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[T\s].*)?$/);
+  if (isoMatch) {
+    return validDate(isoMatch[1], isoMatch[2], isoMatch[3]);
+  }
+
+  const dayFirstMatch = candidate.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (dayFirstMatch) {
+    return validDate(dayFirstMatch[3], dayFirstMatch[2], dayFirstMatch[1]);
+  }
+
+  return "";
+}
+
+function validDate(yearText: string, monthText: string, dayText: string): string {
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return "";
+  }
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}

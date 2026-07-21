@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { api } from '../lib/api';
 import { translateExpertData } from '../lib/gemini';
 import { useReferenceData } from '../lib/ReferenceDataContext';
-import { normalizeEducationLevel, normalizeExpertType } from '../lib/expertNormalization';
+import { normalizeDateForInput, normalizeEducationLevel, normalizeExpertType } from '../lib/expertNormalization';
 
 interface AddExpertModalProps {
   isOpen: boolean;
@@ -105,7 +105,7 @@ export default function AddExpertModal({ isOpen, onClose, onSuccess, initialData
     type: initialData?.type || 'External',
     skills: Array.isArray(initialData?.skills) ? initialData.skills.join(', ') : (initialData?.skills || ''),
     software: Array.isArray(initialData?.software) ? initialData.software.join(', ') : (initialData?.software || ''),
-    dateOfBirth: initialData?.dateOfBirth || '',
+    dateOfBirth: normalizeDateForInput(initialData?.dateOfBirth),
     countryOfCitizenship: initialData?.countryOfCitizenship || '',
     profileSummary: initialData?.profileSummary || '',
     availability: initialData?.availability || '',
@@ -141,7 +141,7 @@ export default function AddExpertModal({ isOpen, onClose, onSuccess, initialData
         type: initialData.type || 'External',
         skills: Array.isArray(initialData?.skills) ? initialData.skills.join(', ') : (initialData?.skills || ''),
         software: Array.isArray(initialData?.software) ? initialData.software.join(', ') : (initialData?.software || ''),
-        dateOfBirth: initialData.dateOfBirth || '',
+        dateOfBirth: normalizeDateForInput(initialData.dateOfBirth),
         countryOfCitizenship: initialData.countryOfCitizenship || '',
         profileSummary: initialData.profileSummary || '',
         availability: initialData.availability || '',
@@ -232,6 +232,7 @@ export default function AddExpertModal({ isOpen, onClose, onSuccess, initialData
       ...formData,
       type: normalizeExpertType(formData.type),
       educationLevel: normalizeEducationLevel(formData.educationLevel),
+      dateOfBirth: normalizeDateForInput(formData.dateOfBirth),
       primary_position: formData.primary_position || '',
       countries: formData.countries ? formData.countries.split(',').map(c => c.trim()).filter(Boolean) : [],
       skills: formData.skills ? formData.skills.split(',').map(s => s.trim()).filter(Boolean) : [],

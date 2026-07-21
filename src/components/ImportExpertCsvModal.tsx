@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { useTasks } from "../lib/TasksContext";
 import {
   normalizeEducationLevel,
+  normalizeDateForInput,
   normalizeExpertType,
   splitCommaSeparated,
 } from "../lib/expertNormalization";
@@ -225,7 +226,7 @@ export function ImportExpertCsvModal({
         phone: row.phone || "",
         location: row.location || "",
         countries: splitCommaSeparated(row.countries),
-        dateOfBirth: row.dateOfBirth || "",
+        dateOfBirth: normalizeDateForInput(row.dateOfBirth),
         countryOfCitizenship: row.countryOfCitizenship || row.citizenship || "",
         availability: row.availability || "",
         profileSummary: row.profileSummary || row.summary || "",
