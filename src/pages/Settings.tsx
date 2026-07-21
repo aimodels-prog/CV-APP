@@ -65,11 +65,6 @@ export default function Settings() {
     organization: 'Tender & Bidding Operations',
     avatar: ''
   });
-  const [passwords, setPasswords] = useState({
-    current: '',
-    new: '',
-    confirm: ''
-  });
   const [hiddenModules, setHiddenModules] = useState<string[]>(['matches', 'generated-cvs']);
 
   useEffect(() => {
@@ -84,12 +79,18 @@ export default function Settings() {
 
       setLoading(false);
       
-      const [savedProfile, savedModules, health] = await Promise.all([
+      const [savedProfile, savedModules, health, currentUser] = await Promise.all([
         api.getAppSetting('profile-settings', null),
         api.getAppSetting('hidden-modules', ['matches', 'generated-cvs']),
         api.health(),
+        api.getCurrentUser(),
       ]);
-      if (savedProfile) setProfile(savedProfile);
+      setProfile((current) => ({
+        ...current,
+        ...(savedProfile || {}),
+        fullName: currentUser.name,
+        email: currentUser.email,
+      }));
       if (Array.isArray(savedModules)) setHiddenModules(savedModules);
       setDatabaseHealth(health);
     }
@@ -134,16 +135,6 @@ export default function Settings() {
 
   const handleSaveProfile = async () => {
     await api.saveAppSetting('profile-settings', profile);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
-  };
-
-  const handleSaveSecurity = () => {
-    if (passwords.new && passwords.new !== passwords.confirm) {
-      alert("New passwords do not match!");
-      return;
-    }
-    setPasswords({ current: '', new: '', confirm: '' });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -650,8 +641,8 @@ export default function Settings() {
                     <input 
                       type="text" 
                       value={profile.fullName}
-                      onChange={e => setProfile({...profile, fullName: e.target.value})}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                      readOnly
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
                     />
                   </div>
                   <div className="space-y-1">
@@ -659,8 +650,8 @@ export default function Settings() {
                     <input 
                       type="email" 
                       value={profile.email}
-                      onChange={e => setProfile({...profile, email: e.target.value})}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                      readOnly
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
                     />
                   </div>
                   <div className="space-y-1 md:col-span-2">
@@ -684,48 +675,15 @@ export default function Settings() {
                   <h3 className="text-lg font-semibold text-slate-900">Security Settings</h3>
                   <p className="text-sm text-slate-500 mt-1">Manage your credentials and access permissions</p>
                 </div>
-                <button 
-                  onClick={handleSaveSecurity}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
-                >
-                  {isSaved ? <CheckCircle2 size={16} /> : <Save size={16} />}
-                  {isSaved ? 'Saved' : 'Save Security'}
-                </button>
               </div>
-              <div className="max-w-2xl space-y-8">
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-slate-800">Change Password</h4>
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Current Password</label>
-                      <input 
-                        type="password"
-                        placeholder="••••••••"
-                        value={passwords.current}
-                        onChange={e => setPasswords({...passwords, current: e.target.value})}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">New Password</label>
-                        <input 
-                          type="password"
-                          value={passwords.new}
-                          onChange={e => setPasswords({...passwords, new: e.target.value})}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Confirm New Password</label>
-                        <input 
-                          type="password"
-                          value={passwords.confirm}
-                          onChange={e => setPasswords({...passwords, confirm: e.target.value})}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                        />
-                      </div>
-                    </div>
+              <div className="max-w-2xl">
+                <div className="flex gap-4 rounded-lg border border-blue-100 bg-blue-50 p-5">
+                  <ShieldCheck className="mt-0.5 shrink-0 text-blue-700" size={22} />
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">Managed by VIA Portal</h4>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Authentication and password security are managed through VIA Google Workspace. This application never receives or stores your Google password.
+                    </p>
                   </div>
                 </div>
               </div>

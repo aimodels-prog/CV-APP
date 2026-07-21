@@ -29,6 +29,12 @@ async function request<T = any>(
   });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      window.location.assign(
+        `/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+      );
+    }
     const error = body?.error;
     throw new ApiRequestError(
       response.status,
@@ -73,6 +79,30 @@ export const postgresMigrationApi = {
 };
 
 export const postgresApi = {
+  getCurrentUser: async () => {
+    const response = await fetch("/api/auth/me");
+    if (!response.ok) {
+      if (response.status === 401 && typeof window !== "undefined") {
+        const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.assign(
+          `/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+        );
+      }
+      throw new ApiRequestError(
+        response.status,
+        "Unable to load the VIA session.",
+        "AUTH_REQUIRED",
+      );
+    }
+    return (await response.json()).user;
+  },
+  logout: async () => {
+    const response = await fetch("/api/auth/logout", { method: "POST" });
+    if (!response.ok) {
+      throw new ApiRequestError(response.status, "Unable to sign out.");
+    }
+    return response.json() as Promise<{ redirectTo: string }>;
+  },
   health: () => request("/health"),
   getBootstrap: () => request<any>("/bootstrap"),
   getReferenceData: async (groupCode: string) => {

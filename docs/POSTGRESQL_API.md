@@ -1,18 +1,18 @@
 # Express PostgreSQL API
 
-Step 3 adds a PostgreSQL-backed Express API under `/api/v2`. The existing React data adapter is intentionally not connected to it yet.
+The PostgreSQL-backed Express API is available under `/api/v2` and is the React application's only data adapter.
 
 ## Activation
 
-The API is mounted when `DATABASE_URL` is configured. Without it, `/api/v2/*` returns HTTP 503 with `DATABASE_NOT_CONFIGURED`. The server honors `PORT` and defaults to `3000`.
+`DATABASE_URL` and the VIA Portal SSO environment variables are required at startup. The server honors `PORT` and defaults to `3000`.
 
-Production write requests require:
+Authenticated VIA Portal users with local `ADMIN` or `STAFF` roles can use the normal application write endpoints. An optional emergency server-to-server token can be sent as:
 
 ```text
 x-admin-token: <API_ADMIN_TOKEN>
 ```
 
-If `API_ADMIN_TOKEN` is missing in production, writes are disabled. Read endpoints remain available. This temporary token boundary will eventually be replaced or supplemented by the application authentication/authorization layer.
+`API_ADMIN_TOKEN` is not exposed to the frontend and is not a username/password login. Browser access is protected by the VIA Portal SSO session.
 
 ## Reference and system endpoints
 
@@ -65,7 +65,7 @@ Tender-document endpoints currently store file metadata and external storage key
 Validated on 2026-07-20 using PostgreSQL 18.3:
 
 - health and bootstrap through the real Express server mount;
-- production write authorization (403 without the token, success with it);
+- VIA Portal session enforcement and authenticated write authorization;
 - expert create/read;
 - tender create/read;
 - two documents attached to one tender;

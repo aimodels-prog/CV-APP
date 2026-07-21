@@ -54,6 +54,7 @@ export default function App() {
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-8 w-full max-w-[100vw]">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/experts" element={<Experts />} />
                 <Route path="/tenders" element={<Tenders />} />
                 <Route path="/tenders/:tenderId" element={<MatchEngine />} />

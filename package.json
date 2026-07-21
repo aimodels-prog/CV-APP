@@ -17,6 +17,7 @@
     "db:migrate": "tsx src/backend/database/migrate.ts",
     "db:check": "tsx src/backend/database/check.ts",
     "db:test-api": "tsx src/backend/database/testApi.ts",
+    "test:sso": "tsx src/backend/testPortalSso.ts",
     "test:tender-extraction": "tsx src/backend/testTenderExtraction.ts"
   },
   "dependencies": {

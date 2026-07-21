@@ -85,9 +85,17 @@ export async function withTransaction<T>(
 
 export function requireWriteAccess(
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction,
 ) {
+  const portalUser = res.locals.portalUser as
+    | { localRole?: string }
+    | undefined;
+  if (portalUser?.localRole === "ADMIN" || portalUser?.localRole === "STAFF") {
+    next();
+    return;
+  }
+
   const configuredToken = process.env.API_ADMIN_TOKEN?.trim();
   if (!configuredToken) {
     if (process.env.NODE_ENV === "production") {

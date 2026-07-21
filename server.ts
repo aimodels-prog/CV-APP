@@ -7,6 +7,7 @@ import multer from "multer";
 import { createPostgresPool } from "./src/backend/database/postgres.ts";
 import { runPostgresMigrations } from "./src/backend/database/migrationRunner.ts";
 import { createPostgresApiRouter } from "./src/backend/api/postgresRouter.ts";
+import { createPortalSso } from "./src/backend/auth/portalSso.ts";
 
 async function startServer() {
   if (!process.env.DATABASE_URL?.trim()) {
@@ -21,7 +22,12 @@ async function startServer() {
   const postgresPool = createPostgresPool();
 
   await runPostgresMigrations(postgresPool);
+  const portalSso = createPortalSso(postgresPool);
+  app.set("trust proxy", 1);
+  app.use(portalSso.consumePortalToken);
+  app.use(portalSso.requireSession);
   app.use(express.json({ limit: "50mb" }));
+  app.use("/api/auth", portalSso.router);
   app.use("/api/v2", createPostgresApiRouter(postgresPool));
 
   app.get("/api/env-check", (_req, res) => {

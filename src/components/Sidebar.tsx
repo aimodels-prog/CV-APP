@@ -53,11 +53,17 @@ export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIs
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const [saved, modules] = await Promise.all([
+        const [currentUser, saved, modules] = await Promise.all([
+          api.getCurrentUser(),
           api.getAppSetting('profile-settings', null),
           api.getAppSetting('hidden-modules', ['matches', 'generated-cvs']),
         ]);
-        if (saved) setProfile((prev) => ({ ...prev, ...saved }));
+        setProfile((prev) => ({
+          ...prev,
+          avatar: saved?.avatar || prev.avatar,
+          fullName: currentUser.name,
+          email: currentUser.email,
+        }));
         if (Array.isArray(modules)) setHiddenModules(modules);
       } catch (error) {
         console.error('Unable to load navigation preferences:', error);
@@ -151,9 +157,13 @@ export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIs
                {!isCollapsed && <span className="text-xs font-medium">Profile</span>}
              </Link>
              <button 
-               onClick={() => {
-                 // Simulate logout
-                 window.location.href = '/';
+               onClick={async () => {
+                 try {
+                   const { redirectTo } = await api.logout();
+                   window.location.assign(redirectTo);
+                 } catch (error) {
+                   console.error('Unable to end VIA session:', error);
+                 }
                }}
                className={clsx("hover:text-red-700 transition-colors flex items-center justify-center gap-2", isCollapsed ? "w-full p-2 text-red-500 hover:bg-red-50 rounded" : "flex-1 hover:bg-red-50 text-red-600 px-2 py-1.5 rounded-md border border-red-100 bg-white")}
                title="Sign Out"
