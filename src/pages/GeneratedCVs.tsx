@@ -26,6 +26,7 @@ import { useReferenceData } from "../lib/ReferenceDataContext";
 import { generateReformatedCV } from "../lib/pdf";
 import { RegenerateCVModal } from "../components/RegenerateCVModal";
 import { appConfirm } from "../lib/notifications";
+import { resolveOutputBranding } from "../lib/outputBranding";
 import { motion, AnimatePresence } from "motion/react";
 import clsx from "clsx";
 import { Document, Page, pdfjs } from "react-pdf";
@@ -126,7 +127,7 @@ export default function GeneratedCVs() {
       updateTask(taskId, { message: "Rendering branded PDF...", percent: 80 });
       const doc = await generateReformatedCV({
         template: cv.template || "Specialized",
-        branding: customBranding || tender?.branding,
+        branding: resolveOutputBranding(customBranding, tender?.branding),
         expert: expert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
       });
@@ -189,7 +190,7 @@ export default function GeneratedCVs() {
 
       const doc = await generateReformatedCV({
         template: cv.template || "Specialized",
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert: translatedExpert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
       });
@@ -228,7 +229,7 @@ export default function GeneratedCVs() {
 
       const doc = await generateReformatedCV({
         template: cv.template || "General",
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert: renderedExpert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
       });
@@ -276,7 +277,7 @@ export default function GeneratedCVs() {
 
       const doc = await generateReformatedCV({
         template: cv.template || "General",
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert: adaptedExpert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
       });
@@ -328,7 +329,7 @@ export default function GeneratedCVs() {
       await generateDocxCV({
         template: cv.template || "Specialized",
         expert: expert,
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
       });
     } catch (err: any) {
@@ -359,7 +360,7 @@ export default function GeneratedCVs() {
 
       const doc = await generateReformatedCV({
         template: cv.template || "Specialized",
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert: expert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
       });
@@ -384,7 +385,7 @@ export default function GeneratedCVs() {
 
       const doc = await generateReformatedCV({
         template: cv.template || "Specialized",
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert: expert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
       });
@@ -822,9 +823,10 @@ export default function GeneratedCVs() {
             docBlob as Blob,
           );
         } else {
+          const tender = await api.getTender(cv.tenderId);
           const doc = await generateReformatedCV({
             template: cv.template || "General",
-            branding: cv.customBranding,
+            branding: resolveOutputBranding(cv.customBranding, tender?.branding),
             expert: cv.expertData,
             position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
           });

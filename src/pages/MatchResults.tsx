@@ -55,6 +55,7 @@ import 'react-quill-new/dist/quill.snow.css';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { appConfirm } from '../lib/notifications';
+import { resolveOutputBranding } from '../lib/outputBranding';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -271,7 +272,7 @@ export default function MatchResults() {
     const tender = await tenderForCv(cv);
     const doc = await generateReformatedCV({
       template: cv.template || selectedTemplate,
-      branding: cv.customBranding || tender?.branding,
+      branding: resolveOutputBranding(cv.customBranding, tender?.branding),
       expert,
       position_title: cv.positionTitle || cv.positionId,
       certification: certificationForOutput(cv, tender),
@@ -290,7 +291,7 @@ export default function MatchResults() {
     return generateDocxCV({
       template: cv.template || selectedTemplate,
       expert,
-      branding: cv.customBranding || tender?.branding,
+      branding: resolveOutputBranding(cv.customBranding, tender?.branding),
       position_title: cv.positionTitle || cv.positionId,
       certification: certificationForOutput(cv, tender),
     }, false);
@@ -917,7 +918,7 @@ export default function MatchResults() {
 
       const doc = await generateReformatedCV({
         template: currentCv.template || "General",
-        branding: currentCv.customBranding || t?.branding,
+        branding: resolveOutputBranding(currentCv.customBranding, t?.branding),
         expert: adaptedExpert,
         position_title: currentCv.positionTitle || currentCv.positionId,
         certification: currentCv.certification,
@@ -979,7 +980,7 @@ export default function MatchResults() {
       );
       const doc = await generateReformatedCV({
         template: currentCv.template || "General",
-        branding: currentCv.customBranding || t?.branding,
+        branding: resolveOutputBranding(currentCv.customBranding, t?.branding),
         expert: renderedExpert,
         position_title: currentCv.positionTitle || currentCv.positionId,
         certification: currentCv.certification,
@@ -1046,10 +1047,10 @@ export default function MatchResults() {
         return;
       }
       const translatedExpert = await translateExpertData(expertToTranslate, lang);
-      const tender = tenders.find(t => t.id === cv.tenderId);
+      const tender = await tenderForCv(cv);
       const doc = await generateReformatedCV({
         template: cv.template || 'General',
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert: translatedExpert,
         position_title: cv.positionTitle || cv.positionId,
         certification: certificationForOutput(cv, tender),
@@ -1100,11 +1101,11 @@ export default function MatchResults() {
       const expert = expertForCv(cv);
       if (!expert) throw new Error("Expert data not found for regeneration");
       
-      const tender = tenders.find(t => t.id === cv.tenderId);
+      const tender = await tenderForCv(cv);
       
       const doc = await generateReformatedCV({
         template: cv.template || 'General',
-        branding: customBranding || tender?.branding,
+        branding: resolveOutputBranding(customBranding, tender?.branding),
         expert: expert,
         position_title: cv.positionTitle || cv.positionId,
         certification: certificationForOutput(cv, tender),
@@ -1186,12 +1187,12 @@ export default function MatchResults() {
          });
          api.getCVs().then(setCvs);
       }
-      const tender = tenders.find(t => t.id === cv.tenderId);
+      const tender = await tenderForCv(cv);
       const { generateDocxCV } = await import('../lib/docx');
       await generateDocxCV({
         template: cv.template || 'General',
         expert,
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         position_title: cv.positionTitle || cv.positionId,
         certification: certificationForOutput(cv, tender),
       });
@@ -1227,10 +1228,10 @@ export default function MatchResults() {
          });
          api.getCVs().then(setCvs);
       }
-      const tender = tenders.find(t => t.id === cv.tenderId);
+      const tender = await tenderForCv(cv);
       const doc = await generateReformatedCV({
         template: cv.template || 'General',
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert,
         position_title: cv.positionTitle || cv.positionId,
         certification: certificationForOutput(cv, tender),
@@ -1269,11 +1270,11 @@ export default function MatchResults() {
       
       setPreviewCv({ ...currentCv, expertData: expert });
       
-      const tender = tenders.find(t => t.id === currentCv.tenderId);
+      const tender = await tenderForCv(currentCv);
       
       const doc = await generateReformatedCV({
         template: currentCv.template || 'General',
-        branding: currentCv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(currentCv.customBranding, tender?.branding),
         expert,
         position_title: currentCv.positionTitle || currentCv.positionId,
         certification: currentCv.certification,

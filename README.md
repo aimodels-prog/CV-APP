@@ -1,4 +1,4 @@
-# ViA CV Generation System
+# VIA CV Tool
 
 Enterprise application for extracting expert CVs and multi-document tenders, matching experts to tender positions, and generating branded PDF/DOCX CVs.
 

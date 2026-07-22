@@ -11,9 +11,9 @@ declare module "jspdf" {
 export interface PDFExportOptions {
   template: "General" | "Specialized";
   branding?: {
-    ministry: string;
-    department: string;
-    tender_no: string;
+    ministry?: string;
+    department?: string;
+    tender_no?: string;
     header_base64?: string;
     footer_base64?: string;
   };
@@ -315,20 +315,6 @@ function generateDoc(doc: any, options: PDFExportOptions) {
   const drawHeader = (doc: any, pageNum: number) => {
     if (branding?.header_base64) {
       addBrandingImage(doc, branding.header_base64, startX, 10, contentWidth, 25);
-    } else {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(0);
-      doc.text("MINISTRY OF AGRICULTURAL, FISHERIES WEALTH AND WATER RESOURCES", startX, 15);
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(9);
-      doc.text("Consultancy Services for Design Review & Construction Supervision of Wadi Bani Umar Flood Protection", startX, 20);
-      doc.text("Dam (A) in Wilayat Liwa, North Al Batinah Governorate, Sultanate of Oman", startX, 25);
-      doc.setDrawColor(0, 85, 170);
-      doc.setLineWidth(1);
-      doc.line(startX, 28, startX + contentWidth, 28);
-      doc.setDrawColor(0);
-      doc.setLineWidth(0.1);
     }
   };
 
@@ -336,17 +322,6 @@ function generateDoc(doc: any, options: PDFExportOptions) {
     doc.setPage(pageNum);
     if (branding?.footer_base64) {
       addBrandingImage(doc, branding.footer_base64, startX, pageHeight - 20, contentWidth, 12);
-    } else {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(0, 85, 170);
-      doc.text("VIA", startX + 5, pageHeight - 12);
-      doc.setFontSize(8);
-      doc.text("INTERNATIONAL", startX, pageHeight - 8);
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text("Technical Proposal", pageWidth / 2, pageHeight - 12, { align: "center" });
     }
   };
 

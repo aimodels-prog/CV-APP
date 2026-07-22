@@ -1,5 +1,5 @@
 {
-  "name": "VIA CV Generation System",
+  "name": "VIA CV Tool",
   "description": "Enterprise AI system for matching experts to tenders and generating branded CVs.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

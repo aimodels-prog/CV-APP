@@ -46,6 +46,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { RegenerateCVModal } from "../components/RegenerateCVModal";
 import { appConfirm } from "../lib/notifications";
+import { resolveOutputBranding } from "../lib/outputBranding";
 import { motion, AnimatePresence } from "motion/react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
@@ -358,7 +359,7 @@ export default function MatchEngine() {
       const translatedExpert = await translateExpertData(expertToTranslate, lang);
       const doc = await generateReformatedCV({
         template: cv.template || "General",
-        branding: cv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert: translatedExpert,
         position_title: cv.positionTitle || cv.positionId,
         certification: certificationForOutput(cv, tender),
@@ -410,7 +411,7 @@ export default function MatchEngine() {
       );
       const doc = await generateReformatedCV({
         template: currentCv.template || "General",
-        branding: currentCv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(currentCv.customBranding, tender?.branding),
         expert: adaptedExpert,
         position_title: currentCv.positionTitle || currentCv.positionId,
         certification: currentCv.certification,
@@ -472,7 +473,7 @@ export default function MatchEngine() {
       );
       const doc = await generateReformatedCV({
         template: currentCv.template || "General",
-        branding: currentCv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(currentCv.customBranding, tender?.branding),
         expert: renderedExpert,
         position_title: currentCv.positionTitle || currentCv.positionId,
         certification: currentCv.certification,
@@ -521,7 +522,7 @@ export default function MatchEngine() {
       if (!expert) throw new Error("Expert data not found for regeneration");
       const doc = await generateReformatedCV({
         template: cv.template || "General",
-        branding: customBranding || tender?.branding,
+        branding: resolveOutputBranding(customBranding, tender?.branding),
         expert: expert,
         position_title: cv.positionTitle || cv.positionId,
         certification: certificationForOutput(cv, tender),
@@ -619,7 +620,7 @@ export default function MatchEngine() {
       await generateDocxCV({
         template: currentCv.template || "General",
         expert,
-        branding: currentCv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(currentCv.customBranding, tender?.branding),
         position_title: currentCv.positionTitle || currentCv.positionId,
         certification: currentCv.certification,
       });
@@ -664,7 +665,7 @@ export default function MatchEngine() {
       }
       const doc = await generateReformatedCV({
         template: currentCv.template || "General",
-        branding: currentCv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(currentCv.customBranding, tender?.branding),
         expert,
         position_title: currentCv.positionTitle || currentCv.positionId,
         certification: currentCv.certification,
@@ -706,7 +707,7 @@ export default function MatchEngine() {
       setPreviewCv({ ...currentCv, expertData: expert });
       const doc = await generateReformatedCV({
         template: currentCv.template || "General",
-        branding: currentCv.customBranding || tender?.branding,
+        branding: resolveOutputBranding(currentCv.customBranding, tender?.branding),
         expert,
         position_title: currentCv.positionTitle || currentCv.positionId,
         certification: currentCv.certification,
