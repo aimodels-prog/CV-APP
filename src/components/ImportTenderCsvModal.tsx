@@ -34,34 +34,35 @@ CSV RULES:
 1. Every row MUST have exactly 33 fields in header order.
 2. Quote fields containing commas, newlines or quotes. Escape " as "".
 3. Use commas for columns; NEVER pipes (|).
-4. Join project_sector, special_requirements and global_team_constraints with semi-colons (;).
+4. Join project_sector, special_requirements and global_team_constraints values with semi-colons (;).
 5. Join position_mandatory_skills and position_required_keywords with commas inside a quoted field.
 6. Never add, rename or rearrange headers. Leave unknown fields empty; never invent.
 
 FIND EVERY POSITION FIRST:
 1. Read every Table of Contents. Find Personnel, Staffing, Consultant Resources, Team Composition, Key/Non-Key Experts, Evaluation, Staff-Month Schedules, CV Forms, Job Descriptions and Annexes.
-2. Scan EVERY page/table in all volumes. Build an internal checklist of each required position's exact title/code and quantity.
+2. Scan EVERY page/table in all volumes. Build an internal checklist of each required position’s exact title/code and quantity.
 3. A valid position appears in a personnel table, requests a CV, has a quantity/staff-month/JOB TITLE, or explicitly requires the consultant to provide that person.
-4. Do not turn disciplines, duties, departments, deliverables, equipment or evaluation subjects into positions. Do not merge distinct positions because duties overlap.
+4. Do not turn disciplines, duties, departments, deliverables, equipment, evaluation subjects or general head-office capabilities into positions. Do not merge distinct positions because duties overlap.
 5. Revisit each position across all files and combine its quantity, education, general/specific experience, duties, sectors, skills and nationality conditions.
 
 POSITION ROWS:
-Extract EVERY explicitly required personnel position. Create ONE NEW ROW per distinct position. Use position_quantity when multiple people share a role.
+Extract EVERY explicitly required personnel position.
+Create ONE NEW ROW per distinct position. Use position_quantity when multiple people share a role.
 Duplicate ALL general tender information in every row. Change only position_* fields. Repeat exactly the same internal_code and name so the app groups all rows as one tender.
 
 FIELD INSTRUCTIONS:
 'status'='OPEN' by default. 'tender_format'=PDF or DOCX.
 Extract or generate 'internal_code' once and repeat it. Use YYYY-MM-DD for a complete 'deadline'.
+Keep 'objective', 'background', 'scope_of_work' and 'deliverables' accurate but concise enough to output every position.
 'position_title'=exact role. 'position_quantity'=integer, default 1 only if implied.
 'position_minimum_education'=exact qualification and discipline.
 'position_minimum_years_experience'=minimum total/general years integer; 0 only if unstated.
 'position_general_experience' and 'position_specific_experience'=exact requirements, including local/Omani alternatives.
-'position_role_description'=all stated duties, responsibilities, authority and reporting.
+'position_role_description'=main duties, authority and reporting.
 Other position_* fields contain only supported sector experience, mandatory skills, matching keywords and nationality conditions.
 
-DETAIL AND FINAL CHECK:
-Preserve comprehensive detail in every tender and position field. Retain every material fact, responsibility, qualification, experience requirement, condition and deliverable. Do not summarize away important information.
-Compare rows/quantities with every personnel table, JOB TITLE, evaluation table, schedule, form and annex. Add every omission; remove duplicates/inventions. NEVER omit a required position.`);
+FINAL CHECK:
+Compare rows/quantities with every personnel table, JOB TITLE, evaluation table, schedule, form and annex. Add omissions; remove duplicates/inventions. If space is limited, shorten narratives; NEVER omit a required position.`);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
