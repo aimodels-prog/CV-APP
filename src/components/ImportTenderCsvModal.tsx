@@ -24,45 +24,28 @@ export function ImportTenderCsvModal({
 
   const handleCopyPrompt = async () => {
     try {
-      await navigator.clipboard.writeText(`Extract information from selected Tender/ToR documents into STRICT CSV. Treat all volumes of the same tender as ONE package. Use ONLY facts in those documents; never use memory, previous answers or another tender.
-Return ONLY raw CSV starting with the header row. No markdown/commentary.
+      await navigator.clipboard.writeText(`Extract selected Tender/ToR files into STRICT CSV. Treat all files as ONE tender. Use ONLY stated facts. Return ONLY CSV; no markdown/commentary.
 
-Use EXACTLY these headers in this order:
+EXACT HEADERS:
 internal_code,name,client,deadline,status,country,tender_format,tender_number,submission_type,project_sector,scope_summary,duration,special_requirements,global_team_constraints,objective,background,scope_of_work,deliverables,methodology,reporting,languages,budget_details,position_title,position_quantity,position_minimum_education,position_minimum_years_experience,position_general_experience,position_specific_experience,position_role_description,position_required_sector_experience,position_mandatory_skills,position_required_keywords,position_nationality_preference
 
 CSV RULES:
-1. Every row MUST have exactly 33 fields in header order.
-2. Quote fields containing commas, newlines or quotes. Escape " as "".
-3. Use commas for columns; NEVER pipes (|).
-4. Join project_sector, special_requirements and global_team_constraints values with semi-colons (;).
-5. Join position_mandatory_skills and position_required_keywords with commas inside a quoted field.
-6. Never add, rename or rearrange headers. Leave unknown fields empty; never invent.
+Every row MUST have exactly 33 fields in header order. Quote fields containing commas, newlines or quotes; escape " as "". Use commas, NEVER pipes. Join project_sector, special_requirements and global_team_constraints with semi-colons (;). Join position_mandatory_skills and position_required_keywords with commas inside quotes. Leave unstated facts empty; never invent.
 
-FIND EVERY POSITION FIRST:
-1. Read every Table of Contents. Find Personnel, Staffing, Consultant Resources, Team Composition, Key/Non-Key Experts, Evaluation, Staff-Month Schedules, CV Forms, Job Descriptions and Annexes.
-2. Scan EVERY page/table in all volumes. Build an internal checklist of each required position’s exact title/code and quantity.
-3. A valid position appears in a personnel table, requests a CV, has a quantity/staff-month/JOB TITLE, or explicitly requires the consultant to provide that person.
-4. Do not turn disciplines, duties, departments, deliverables, equipment, evaluation subjects or general head-office capabilities into positions. Do not merge distinct positions because duties overlap.
-5. Revisit each position across all files and combine its quantity, education, general/specific experience, duties, sectors, skills and nationality conditions.
+FIND ALL POSITIONS FIRST:
+Read each Table of Contents and EVERY page/table. Check Personnel, Staffing, Team Composition, Key/Non-Key Experts, Evaluation, Schedules, CV Forms, JOB TITLE and Annexes. List roles/quantities internally. Accept only explicitly required personnel. Never turn duties, disciplines or deliverables into positions. Keep roles separate; merge same-role facts and deduplicate.
 
-POSITION ROWS:
-Extract EVERY explicitly required personnel position.
-Create ONE NEW ROW per distinct position. Use position_quantity when multiple people share a role.
-Duplicate ALL general tender information in every row. Change only position_* fields. Repeat exactly the same internal_code and name so the app groups all rows as one tender.
+ROWS:
+Create ONE ROW per role; use position_quantity for several people sharing it. Duplicate ALL tender fields; repeat identical internal_code and name. Change only position_* fields. Never omit required personnel.
 
-FIELD INSTRUCTIONS:
-'status'='OPEN' by default. 'tender_format'=PDF or DOCX.
-Extract or generate 'internal_code' once and repeat it. Use YYYY-MM-DD for a complete 'deadline'.
-Keep 'objective', 'background', 'scope_of_work' and 'deliverables' accurate but concise enough to output every position.
-'position_title'=exact role. 'position_quantity'=integer, default 1 only if implied.
-'position_minimum_education'=exact qualification and discipline.
-'position_minimum_years_experience'=minimum total/general years integer; 0 only if unstated.
-'position_general_experience' and 'position_specific_experience'=exact requirements, including local/Omani alternatives.
-'position_role_description'=main duties, authority and reporting.
-Other position_* fields contain only supported sector experience, mandatory skills, matching keywords and nationality conditions.
+TENDER FIELDS:
+internal_code=official/stable code; name=full title; client=authority; deadline=submission date (YYYY-MM-DD if complete); status=OPEN unless stated; country=assignment country; tender_format=PDF/DOCX; tender_number=reference; submission_type=method; project_sector=all sectors; scope_summary=rich overview; duration=service period; special_requirements=ONLY firm eligibility/experience, JV/association, submission, certification, insurance, guarantee, legal, financial or other tender-wide mandates; global_team_constraints=ONLY team-wide composition, deployment, dedication, availability, location, staffing limits or nationality/local-participation; objective=full outcomes; background=full context; scope_of_work=all services/tasks; deliverables=all outputs/stages/deadlines; methodology=approach/work plan; reporting=reports/frequency/recipients; languages=required languages; budget_details=budget/currency/taxes/limits/payment terms.
 
-FINAL CHECK:
-Compare rows/quantities with every personnel table, JOB TITLE, evaluation table, schedule, form and annex. Add omissions; remove duplicates/inventions. If space is limited, shorten narratives; NEVER omit a required position.`);
+POSITION FIELDS:
+position_title=clean exact role, removing Position, K-1/K1, N-1/N1 and row numbers; position_quantity=integer, 1 only if implied; position_minimum_education=exact level/degree/discipline/qualification; position_minimum_years_experience=minimum total/general years integer, 0 if unstated; position_general_experience=full overall criteria; position_specific_experience=full role/sector/project/regional/local criteria/alternatives; position_role_description=all duties, authority, coordination/reporting; position_required_sector_experience=explicit sectors/projects; position_mandatory_skills=explicit technical/software/licence/language/standard requirements; position_required_keywords=precise supported terms; position_nationality_preference=ONLY role-specific nationality/local preference. Never infer from title.
+
+DETAIL/CHECK:
+Preserve rich detail and every material condition. DO NOT summarize, shorten or use vague phrases. Cross-check tables, job titles, evaluations, schedules, CV forms and annexes. Add omissions; remove duplicates/inventions. Retain every position and all details.`);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {

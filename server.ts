@@ -109,8 +109,35 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
+    const assetsPath = path.join(distPath, "assets");
+
+    // Vite filenames are content-hashed and may be cached permanently. A missing
+    // asset must remain a 404; returning the SPA HTML causes a module MIME error.
+    app.use(
+      "/assets",
+      express.static(assetsPath, {
+        immutable: true,
+        maxAge: "1y",
+      }),
+    );
+    app.use("/assets", (_req, res) => {
+      res.status(404).type("text/plain").send("Asset not found.");
+    });
+
+    app.use(
+      express.static(distPath, {
+        index: false,
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith(".html")) {
+            res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+          }
+        },
+      }),
+    );
+    app.get("*", (_req, res) => {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.sendFile(path.join(distPath, "index.html"));
+    });
   }
 
   const server = app.listen(port, "0.0.0.0", () => {

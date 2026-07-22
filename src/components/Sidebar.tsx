@@ -16,6 +16,7 @@ import { Link, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import viaInternationalLogo from '../assets/via-international-logo.png';
 
 function SidebarItem({ to, icon: Icon, label, onClick, isCollapsed }: { to: string, icon: any, label: string, onClick?: () => void, isCollapsed: boolean }) {
   const location = useLocation();
@@ -119,11 +120,20 @@ export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIs
 
         <div className={clsx("flex-1 flex flex-col overflow-hidden", isCollapsed ? "p-4" : "p-4 sm:p-6")}>
           <div className={clsx("flex items-center mb-8", isCollapsed ? "justify-center" : "justify-between")}>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-[#004b87] rounded flex items-center justify-center shrink-0">
-                <span className="text-white font-bold text-lg leading-none">v</span>
-              </div>
-              {!isCollapsed && <h1 className="text-xl font-bold text-slate-900 truncate">VIA Int</h1>}
+            <div className={clsx("flex flex-col", isCollapsed ? "items-center" : "items-start")}>
+              <img
+                src={viaInternationalLogo}
+                alt="VIA International"
+                className={clsx(
+                  "object-contain shrink-0",
+                  isCollapsed ? "w-12 h-9 object-center" : "w-40 h-12 object-left",
+                )}
+              />
+              {!isCollapsed && (
+                <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  CV Generation System
+                </span>
+              )}
             </div>
             {setIsOpen && !isCollapsed && (
               <button 
@@ -178,10 +188,10 @@ export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIs
                  }
                }}
                className={clsx("hover:text-red-700 transition-colors flex items-center justify-center gap-2", isCollapsed ? "w-full p-2 text-red-500 hover:bg-red-50 rounded" : "flex-1 hover:bg-red-50 text-red-600 px-2 py-1.5 rounded-md border border-red-100 bg-white")}
-               title="Sign Out"
+               title="Back to Portal"
              >
                <LogOut size={16} />
-               {!isCollapsed && <span className="text-xs font-medium">Sign Out</span>}
+               {!isCollapsed && <span className="text-xs font-medium">Back to Portal</span>}
              </button>
           </div>
         </div>

@@ -345,7 +345,9 @@ async function sessionUser(pool: Pool, token: string): Promise<PortalSessionUser
 }
 
 function isPublicAsset(pathname: string): boolean {
-  return pathname.startsWith("/assets/") || pathname === "/favicon.ico";
+  return pathname.startsWith("/assets/")
+    || pathname === "/favicon.ico"
+    || pathname === "/via-international-logo.png";
 }
 
 export function createPortalSso(pool: Pool) {
