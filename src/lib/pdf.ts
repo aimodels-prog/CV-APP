@@ -96,6 +96,12 @@ export function cleanText(text: any, preserveNewlines: boolean = false): string 
   return result.trim();
 }
 
+function getExpertProfileSummary(expert: any): string {
+  return cleanText(
+    expert?.profileSummary || expert?.profile_summary || expert?.summary,
+  );
+}
+
 export async function generateReformatedCV(options: PDFExportOptions) {
   const doc = new jsPDF();
   if (options.template === "Specialized") {
@@ -321,7 +327,7 @@ function generateDoc(doc: any, options: PDFExportOptions) {
   const drawFooter = (doc: any, pageNum: number, totalPages: number) => {
     doc.setPage(pageNum);
     if (branding?.footer_base64) {
-      addBrandingImage(doc, branding.footer_base64, startX, pageHeight - 20, contentWidth, 12);
+      addBrandingImage(doc, branding.footer_base64, startX, pageHeight - 20, contentWidth, 18);
     }
   };
 
@@ -378,8 +384,9 @@ function generateDoc(doc: any, options: PDFExportOptions) {
   });
 
   // PROFILE
-  if (cleanText(expert.profile_summary || expert.summary)) {
-    const profileLines = safeSplitText(doc, cleanText(expert.profile_summary || expert.summary), contentWidth);
+  const profileSummary = getExpertProfileSummary(expert);
+  if (profileSummary) {
+    const profileLines = safeSplitText(doc, profileSummary, contentWidth);
     y = preparePdfSection(doc, y, pageHeight, 40, 30, Math.min(profileLines.length, 2) * 5.5);
     doc.setFont("helvetica", "bold");
     doc.text("PROFILE:", startX, y);
@@ -684,7 +691,7 @@ function generateSpecialized(doc: any, options: PDFExportOptions) {
   // Profile
   const profileLines = safeSplitText(
     doc,
-    cleanText(expert.profile_summary || expert.summary),
+    getExpertProfileSummary(expert),
     contentWidth,
   );
   y = preparePdfSection(doc, y, pageHeight, 50, 40, Math.min(profileLines.length, 2) * 5);

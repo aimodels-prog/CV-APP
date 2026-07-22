@@ -30,7 +30,7 @@ EXACT HEADERS:
 internal_code,name,client,deadline,status,country,tender_format,tender_number,submission_type,project_sector,scope_summary,duration,special_requirements,global_team_constraints,objective,background,scope_of_work,deliverables,methodology,reporting,languages,budget_details,position_title,position_quantity,position_minimum_education,position_minimum_years_experience,position_general_experience,position_specific_experience,position_role_description,position_required_sector_experience,position_mandatory_skills,position_required_keywords,position_nationality_preference
 
 CSV RULES:
-Every row MUST have exactly 33 fields in header order. Quote fields containing commas, newlines or quotes; escape " as "". Use commas, NEVER pipes. Join project_sector, special_requirements and global_team_constraints with semi-colons (;). Join position_mandatory_skills and position_required_keywords with commas inside quotes. Leave unstated facts empty; never invent.
+Rows: EXACTLY 33 fields. Double-quote EVERY field (empty/text/date/number); empty="". Escape internal " as "". Header unquoted. Use commas, NEVER pipes. Join project_sector, special_requirements, global_team_constraints with semi-colons (;). Join position_mandatory_skills, position_required_keywords with commas inside quotes. Unknown=""; never invent.
 
 FIND ALL POSITIONS FIRST:
 Read each Table of Contents and EVERY page/table. Check Personnel, Staffing, Team Composition, Key/Non-Key Experts, Evaluation, Schedules, CV Forms, JOB TITLE and Annexes. List roles/quantities internally. Accept only explicitly required personnel. Never turn duties, disciplines or deliverables into positions. Keep roles separate; merge same-role facts and deduplicate.
