@@ -883,6 +883,9 @@ export function createPostgresApiRouter(pool: Pool) {
     requireWriteAccess,
     asyncRoute(async (req, res) => {
       const deleted = await withTransaction(pool, async (client) => {
+        await client.query(`DELETE FROM generated_cvs WHERE tender_id = $1`, [
+          req.params.id,
+        ]);
         await client.query(`DELETE FROM matches WHERE tender_id = $1`, [
           req.params.id,
         ]);

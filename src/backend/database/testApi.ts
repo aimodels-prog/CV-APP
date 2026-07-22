@@ -362,6 +362,26 @@ async function runApiIntegrationTest() {
       "Statistics endpoint returned incorrect counts.",
     );
 
+    await request("/tenders/integration-tender-1", { method: "DELETE" });
+    const statsAfterTenderDelete = await request("/stats");
+    assert(
+      statsAfterTenderDelete.activeTenders === 1 &&
+        statsAfterTenderDelete.totalMatches === 1 &&
+        statsAfterTenderDelete.cvsGenerated === 1,
+      "Tender deletion did not update related counters.",
+    );
+    const matchesAfterTenderDelete = await request(
+      "/matches?tenderId=integration-tender-1",
+    );
+    const cvsAfterTenderDelete = await request("/generated-cvs");
+    assert(
+      matchesAfterTenderDelete.length === 0 &&
+        !cvsAfterTenderDelete.some(
+          (cv: any) => cv.tenderId === "integration-tender-1",
+        ),
+      "Tender deletion left related matches or generated CVs behind.",
+    );
+
     console.log({
       ok: true,
       tested: [
@@ -378,6 +398,7 @@ async function runApiIntegrationTest() {
         "settings",
         "preferences",
         "statistics",
+        "tender deletion cascade",
       ],
     });
   } finally {

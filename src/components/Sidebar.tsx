@@ -129,11 +129,6 @@ export default function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIs
                   isCollapsed ? "w-12 h-9 object-center" : "w-40 h-12 object-left",
                 )}
               />
-              {!isCollapsed && (
-                <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  CV Generation System
-                </span>
-              )}
             </div>
             {setIsOpen && !isCollapsed && (
               <button 

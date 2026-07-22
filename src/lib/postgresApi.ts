@@ -226,11 +226,11 @@ export const postgresApi = {
     return { success: true, cv: created };
   },
   updateCV: async (cv: any) => {
-    await request(`/generated-cvs/${encodeURIComponent(cv.id)}`, {
+    const updated = await request(`/generated-cvs/${encodeURIComponent(cv.id)}`, {
       method: "PATCH",
       body: JSON.stringify(cv),
     });
-    return { success: true };
+    return updated;
   },
   getCVs: () => request<any[]>("/generated-cvs"),
 

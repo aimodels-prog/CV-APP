@@ -20,21 +20,35 @@
     <link rel="icon" type="image/png" href="/via-international-logo.png" />
     <link rel="apple-touch-icon" href="/via-international-logo.png" />
     <title>VIA CV Generation System</title>
+    <script>
+      (() => {
+        const refreshParameter = '_asset_refresh';
+
+        window.reloadForMissingAsset = () => {
+          const url = new URL(window.location.href);
+          if (url.searchParams.has(refreshParameter)) return;
+          url.searchParams.set(refreshParameter, Date.now().toString());
+          window.location.replace(url.toString());
+        };
+
+        window.addEventListener('error', (event) => {
+          const target = event.target;
+          const missingModule = target instanceof HTMLScriptElement && target.type === 'module';
+          const missingStylesheet = target instanceof HTMLLinkElement && target.rel === 'stylesheet';
+          if (missingModule || missingStylesheet) window.reloadForMissingAsset();
+        }, true);
+
+        window.addEventListener('load', () => {
+          const url = new URL(window.location.href);
+          if (!url.searchParams.has(refreshParameter)) return;
+          url.searchParams.delete(refreshParameter);
+          window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+        });
+      })();
+    </script>
   </head>
   <body>
     <script>
-      window.reloadForMissingModule = () => {
-        const url = new URL(window.location.href);
-        if (url.searchParams.has('_asset_refresh')) return;
-        url.searchParams.set('_asset_refresh', Date.now().toString());
-        window.location.replace(url.toString());
-      };
-      window.addEventListener('load', () => {
-        const url = new URL(window.location.href);
-        if (!url.searchParams.has('_asset_refresh')) return;
-        url.searchParams.delete('_asset_refresh');
-        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-      });
       window.addEventListener('error', (e) => {
         if (e.message?.includes('WebSocket') || e.message?.includes('connection')) return;
         document.body.innerHTML += `<div style="position:fixed;top:0;left:0;background:red;color:white;z-index:9999;padding:20px;font-family:monospace"><b>${e.message}</b><pre>${e.error?.stack}</pre></div>`;
@@ -46,6 +60,6 @@
       });
     </script>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx" onerror="window.reloadForMissingModule()"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

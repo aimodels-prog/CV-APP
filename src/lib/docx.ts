@@ -50,7 +50,7 @@ function createTextParagraph(text: string, options: any = {}) {
     });
 }
 
-export async function generateDocxCV(options: PDFExportOptions) {
+export async function generateDocxCV(options: PDFExportOptions, download = true): Promise<Blob> {
   const { expert, position_title, certification } = options;
   const resolvedTitle = position_title && !position_title.startsWith("pos_") ? position_title : (expert.primary_position || "Resident Inspector");
 
@@ -463,5 +463,8 @@ export async function generateDocxCV(options: PDFExportOptions) {
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${cleanText(expert.fullName || expert.name)}_CV.docx`);
+  if (download) {
+    saveAs(blob, `${cleanText(expert.fullName || expert.name)}_CV.docx`);
+  }
+  return blob;
 }

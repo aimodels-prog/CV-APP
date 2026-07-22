@@ -45,13 +45,15 @@ import { useTasks } from "../lib/TasksContext";
 import ConfirmModal from "../components/ConfirmModal";
 import { RegenerateCVModal } from "../components/RegenerateCVModal";
 import { translateExpertData, adaptExpertData, renderExpertData } from "../lib/gemini";
-import { downloadHtmlAsPdf, downloadHtmlAsDocx } from "../lib/exportHtml";
+import { createHtmlDocBlob, downloadHtmlAsPdf, downloadHtmlAsDocx } from "../lib/exportHtml";
 import { generateCVHtml } from "../lib/htmlCV";
 import CertificationModal from "../components/CertificationModal";
 import { resolveCertificationSettings } from "../lib/certificationSettings";
 import { Document, Page, pdfjs } from 'react-pdf';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -59,6 +61,21 @@ const certificationForOutput = (cv: any, tender: any) =>
   cv?.id?.startsWith("phantom-")
     ? resolveCertificationSettings(cv.certification, tender)
     : cv?.certification;
+
+type CvMode = 'NORMAL' | 'ADAPT' | 'RENDER';
+
+const cvMode = (cv: any): CvMode => {
+  const mode = String(cv?.mode || cv?.generationMode || '').toUpperCase();
+  if (mode.includes('RENDER') || cv?.isRendered) return 'RENDER';
+  if (mode.includes('ADAPT') || cv?.isAdapted) return 'ADAPT';
+  return 'NORMAL';
+};
+
+const safeFilePart = (value: unknown, fallback: string) =>
+  String(value || fallback)
+    .trim()
+    .replace(/[<>:"/\\|?*]+/g, '_')
+    .replace(/\s+/g, '_');
 
 export default function MatchResults() {
   const { values } = useReferenceData();
@@ -96,6 +113,11 @@ export default function MatchResults() {
   const [positionSearchQueries, setPositionSearchQueries] = useState<Record<string, string>>({});
   const [candidateSearchQueries, setCandidateSearchQueries] = useState<Record<string, string>>({});
   const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
+  const [bulkCvMode, setBulkCvMode] = useState<CvMode>('NORMAL');
+  const [bulkLanguage, setBulkLanguage] = useState('');
+  const [isBulkActionRunning, setIsBulkActionRunning] = useState(false);
+  const [bulkPreviewQueue, setBulkPreviewQueue] = useState<any[]>([]);
+  const [bulkPreviewIndex, setBulkPreviewIndex] = useState(0);
   const [feedback, setFeedback] = useState<
     Record<string, { type: "up" | "down"; reason?: string }>
   >({});
@@ -108,10 +130,10 @@ export default function MatchResults() {
     .filter((t) => t.type === "GENERATE" && t.status === "running")
     .map((t) => t.message?.match(/ID: ([\w-]+)/)?.[1])
     .filter(Boolean);
-  const isBulkGenerating = tasks.some(
+  const isBulkGenerating = isBulkActionRunning || tasks.some(
     (t) =>
       t.type === "GENERATE" &&
-      t.title.startsWith("Bulk Generate") &&
+      t.title.startsWith("Bulk ") &&
       t.status === "running",
   );
   const activeBulkTask = tasks.find(
@@ -191,6 +213,87 @@ export default function MatchResults() {
     acc[tenderName][positionTitle].push(match);
     return acc;
   }, {});
+
+  const matchesCvIdentity = (cv: any, source: any) => {
+    if (cv.matchId && source.id && cv.matchId === source.id) return true;
+    const sameTender = cv.tenderId === source.tenderId;
+    const sameExpert = cv.expertId === source.expertId;
+    const cvPosition = cv.positionId || cv.positionTitle;
+    const sourcePosition = source.positionId || source.positionTitle;
+    return sameTender && sameExpert && cvPosition === sourcePosition;
+  };
+
+  const storedCvForMode = (source: any, mode: CvMode) =>
+    cvs.find((cv: any) => {
+      const language = String(cv.language || 'English').toUpperCase();
+      return matchesCvIdentity(cv, source) && cvMode(cv) === mode && language === 'ENGLISH';
+    });
+
+  const phantomCvForMode = (match: any, mode: CvMode) => ({
+    ...match,
+    id: `phantom-${match.id}-${mode.toLowerCase()}`,
+    matchId: match.id,
+    mode,
+    language: 'English',
+    template: selectedTemplate,
+    isAdapted: mode === 'ADAPT',
+    isRendered: mode === 'RENDER',
+  });
+
+  const cvForMode = (match: any, mode: CvMode) =>
+    storedCvForMode(match, mode) || (mode === 'NORMAL' ? phantomCvForMode(match, mode) : null);
+
+  const expertForCv = (cv: any) =>
+    cv?.expertData || allExperts.find((expert) => expert.id === cv?.expertId || expert.name === cv?.expertName);
+
+  const selectedMatches = () =>
+    filteredMatches.filter((match) => selectedMatchIds.includes(match.id));
+
+  const selectedVersionCvs = () =>
+    selectedMatches()
+      .map((match) => cvForMode(match, bulkCvMode))
+      .filter(Boolean) as any[];
+
+  const tenderForCv = async (cv: any) =>
+    tenders.find((tender) => tender.id === cv.tenderId) || api.getTender(cv.tenderId);
+
+  const buildPdfBlob = async (cv: any, expertOverride?: any): Promise<Blob> => {
+    if (cv.customRichText) {
+      return await downloadHtmlAsPdf(
+        cv.customRichText,
+        `CV_${safeFilePart(cv.expertName, 'Expert')}`,
+        true,
+      ) as Blob;
+    }
+    const expert = expertOverride || expertForCv(cv);
+    if (!expert) throw new Error(`Expert data missing for ${cv.expertName || 'selected CV'}.`);
+    const tender = await tenderForCv(cv);
+    const doc = await generateReformatedCV({
+      template: cv.template || selectedTemplate,
+      branding: cv.customBranding || tender?.branding,
+      expert,
+      position_title: cv.positionTitle || cv.positionId,
+      certification: certificationForOutput(cv, tender),
+    });
+    return doc.output('blob');
+  };
+
+  const buildDocxBlob = async (cv: any): Promise<Blob> => {
+    if (cv.customRichText) {
+      return createHtmlDocBlob(cv.customRichText, `CV_${safeFilePart(cv.expertName, 'Expert')}`);
+    }
+    const expert = expertForCv(cv);
+    if (!expert) throw new Error(`Expert data missing for ${cv.expertName || 'selected CV'}.`);
+    const tender = await tenderForCv(cv);
+    const { generateDocxCV } = await import('../lib/docx');
+    return generateDocxCV({
+      template: cv.template || selectedTemplate,
+      expert,
+      branding: cv.customBranding || tender?.branding,
+      position_title: cv.positionTitle || cv.positionId,
+      certification: certificationForOutput(cv, tender),
+    }, false);
+  };
 
   const toggleMatchSelection = (matchId: string) => {
     setSelectedMatchIds((prev) =>
@@ -292,7 +395,9 @@ export default function MatchResults() {
             certification: resolveCertificationSettings(undefined, tender),
           });
 
-          await api.saveCV({
+          const normalRecord = {
+            matchId: match.id,
+            mode: "NORMAL",
             expertId: match.expertId,
             expertName: match.expertName,
             tenderId: match.tenderId,
@@ -305,7 +410,10 @@ export default function MatchResults() {
             strong_points: match.strong_points,
             risk_level: match.risk_level,
             template: selectedTemplate,
-          });
+          };
+          const existingNormal = storedCvForMode(match, 'NORMAL');
+          if (existingNormal) await api.updateCV({ ...existingNormal, ...normalRecord, id: existingNormal.id });
+          else await api.saveCV(normalRecord);
 
           doc.save(
             `${selectedTemplate}_CV_${(match.expertName || "Unnamed").split(" ").join("_")}.pdf`,
@@ -321,6 +429,7 @@ export default function MatchResults() {
         eta: 0,
         message: `Completed ${targets.length} CVs`,
       });
+      setCvs(await api.getCVs());
     } catch (err: any) {
       console.error(err);
       updateTask(taskId, { status: "error", message: err.message });
@@ -370,8 +479,9 @@ export default function MatchResults() {
             certification: resolveCertificationSettings(undefined, t),
           });
 
-          // If phantom, we should ideally save it first. But for bulk, we just save the match details
-          let currentCv = {
+          const currentCv = {
+             matchId: match.id,
+             mode: "ADAPT",
              expertId: match.expertId,
              expertName: match.expertName,
              tenderId: match.tenderId,
@@ -384,15 +494,15 @@ export default function MatchResults() {
              strong_points: match.strong_points,
              risk_level: match.risk_level,
              template: selectedTemplate,
+             expertData: adaptedExpert,
+             customRichText: undefined,
+             isAdapted: true,
+             isRendered: false,
           };
 
-          const updatedCvRes = await api.updateCV({
-            ...currentCv,
-            expertData: adaptedExpert,
-            customRichText: undefined,
-            isAdapted: true,
-            isRendered: false,
-          });
+          const existingCv = storedCvForMode(match, 'ADAPT');
+          if (existingCv) await api.updateCV({ ...existingCv, ...currentCv, id: existingCv.id });
+          else await api.saveCV(currentCv);
 
           doc.save(`${selectedTemplate} - ${adaptedExpert.fullName || adaptedExpert.name || "Expert"} (Adapted).pdf`);
           await new Promise((r) => setTimeout(r, 500));
@@ -405,6 +515,7 @@ export default function MatchResults() {
         eta: 0,
         message: `Completed ${targets.length} Adapted CVs`,
       });
+      setCvs(await api.getCVs());
     } catch (err: any) {
       console.error(err);
       updateTask(taskId, { status: "error", message: err.message });
@@ -454,7 +565,9 @@ export default function MatchResults() {
             certification: resolveCertificationSettings(undefined, t),
           });
 
-          let currentCv = {
+          const currentCv = {
+             matchId: match.id,
+             mode: "RENDER",
              expertId: match.expertId,
              expertName: match.expertName,
              tenderId: match.tenderId,
@@ -467,15 +580,15 @@ export default function MatchResults() {
              strong_points: match.strong_points,
              risk_level: match.risk_level,
              template: selectedTemplate,
+             expertData: renderedExpert,
+             customRichText: undefined,
+             isAdapted: true,
+             isRendered: true,
           };
 
-          const updatedCvRes = await api.updateCV({
-            ...currentCv,
-            expertData: renderedExpert,
-            customRichText: undefined,
-            isAdapted: true,
-            isRendered: true,
-          });
+          const existingCv = storedCvForMode(match, 'RENDER');
+          if (existingCv) await api.updateCV({ ...existingCv, ...currentCv, id: existingCv.id });
+          else await api.saveCV(currentCv);
 
           doc.save(`${selectedTemplate} - ${renderedExpert.fullName || renderedExpert.name || "Expert"} (Rendered).pdf`);
           await new Promise((r) => setTimeout(r, 500));
@@ -488,10 +601,176 @@ export default function MatchResults() {
         eta: 0,
         message: `Completed ${targets.length} Rendered CVs`,
       });
+      setCvs(await api.getCVs());
     } catch (err: any) {
       console.error(err);
       updateTask(taskId, { status: "error", message: err.message });
     }
+  };
+
+  const requireSelectedVersionCvs = () => {
+    const selected = selectedMatches();
+    if (selected.length === 0) {
+      alert('Select one or more matches first.');
+      return [];
+    }
+    const versions = selectedVersionCvs();
+    if (versions.length === 0) {
+      alert(`None of the selected matches has a ${bulkCvMode.toLowerCase()} CV yet.`);
+      return [];
+    }
+    if (versions.length < selected.length) {
+      alert(`${selected.length - versions.length} selected match(es) have no ${bulkCvMode.toLowerCase()} CV and will be skipped.`);
+    }
+    return versions;
+  };
+
+  const handleBulkPackage = async (format: 'word' | 'pdf', regenerate = false) => {
+    if (isBulkActionRunning) return;
+    const targets = requireSelectedVersionCvs();
+    if (targets.length === 0) return;
+    const actionName = regenerate ? 'Regenerate' : format === 'word' ? 'Word export' : 'PDF export';
+    if (!confirm(`${actionName} ${targets.length} ${bulkCvMode.toLowerCase()} CV(s)?`)) return;
+
+    setIsBulkActionRunning(true);
+    const taskId = addTask({
+      type: 'GENERATE',
+      title: `Bulk ${actionName} (${targets.length} CVs)`,
+      message: `Preparing ${bulkCvMode.toLowerCase()} CV package...`,
+    });
+    const zip = new JSZip();
+    const failures: string[] = [];
+
+    try {
+      for (let index = 0; index < targets.length; index++) {
+        const cv = targets[index];
+        updateTask(taskId, {
+          percent: Math.round((index / targets.length) * 100),
+          message: `${actionName}: ${index + 1}/${targets.length} — ${cv.expertName || 'Expert'}`,
+        });
+        try {
+          const expertName = safeFilePart(cv.expertName, 'Expert');
+          const position = safeFilePart(cv.positionTitle || cv.positionId, 'Position');
+          if (format === 'word' && !regenerate) {
+            const blob = await buildDocxBlob(cv);
+            zip.file(`${expertName}_${position}_${bulkCvMode}.${cv.customRichText ? 'doc' : 'docx'}`, blob);
+          } else {
+            const blob = await buildPdfBlob(cv);
+            zip.file(`${expertName}_${position}_${bulkCvMode}.pdf`, blob);
+          }
+
+          if (regenerate && cv.id?.startsWith('phantom-')) {
+            const { id: _phantomId, ...record } = cv;
+            await api.saveCV({ ...record, mode: bulkCvMode, language: 'English' });
+          }
+        } catch (error: any) {
+          failures.push(`${cv.expertName || 'Expert'}: ${error.message}`);
+        }
+      }
+
+      if (Object.keys(zip.files).length === 0) throw new Error('No CV files could be generated.');
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, `Global_Matches_${bulkCvMode}_${regenerate ? 'Regenerated' : format.toUpperCase()}_${Date.now()}.zip`);
+      setCvs(await api.getCVs());
+      updateTask(taskId, {
+        status: failures.length === targets.length ? 'error' : 'completed',
+        percent: 100,
+        eta: 0,
+        message: failures.length
+          ? `Completed ${targets.length - failures.length}/${targets.length}; ${failures.length} failed.`
+          : `Completed ${targets.length}/${targets.length} CVs.`,
+      });
+      if (failures.length) alert(`Some CVs could not be processed:\n${failures.join('\n')}`);
+    } catch (error: any) {
+      updateTask(taskId, { status: 'error', message: error.message });
+      alert(`${actionName} failed: ${error.message}`);
+    } finally {
+      setIsBulkActionRunning(false);
+    }
+  };
+
+  const handleBulkTranslate = async () => {
+    if (isBulkActionRunning) return;
+    const targets = requireSelectedVersionCvs();
+    if (targets.length === 0) return;
+    if (!bulkLanguage) {
+      alert('Select a target language first.');
+      return;
+    }
+    if (!confirm(`Translate ${targets.length} ${bulkCvMode.toLowerCase()} CV(s) to ${bulkLanguage}?`)) return;
+
+    setIsBulkActionRunning(true);
+    const taskId = addTask({
+      type: 'GENERATE',
+      title: `Bulk Translate (${targets.length} CVs)`,
+      message: `Translating ${bulkCvMode.toLowerCase()} CVs to ${bulkLanguage}...`,
+    });
+    const zip = new JSZip();
+    const failures: string[] = [];
+
+    try {
+      for (let index = 0; index < targets.length; index++) {
+        const cv = targets[index];
+        updateTask(taskId, {
+          percent: Math.round((index / targets.length) * 100),
+          message: `Translating ${index + 1}/${targets.length} — ${cv.expertName || 'Expert'}`,
+        });
+        try {
+          const sourceExpert = expertForCv(cv);
+          if (!sourceExpert) throw new Error('Expert data is missing.');
+          const translatedExpert = await translateExpertData(sourceExpert, bulkLanguage);
+          const pdf = await buildPdfBlob(cv, translatedExpert);
+          const expertName = safeFilePart(cv.expertName, 'Expert');
+          const position = safeFilePart(cv.positionTitle || cv.positionId, 'Position');
+          zip.file(`${expertName}_${position}_${bulkCvMode}_${safeFilePart(bulkLanguage, 'Translation')}.pdf`, pdf);
+
+          const existing = cvs.find((candidate: any) =>
+            matchesCvIdentity(candidate, cv) &&
+            cvMode(candidate) === bulkCvMode &&
+            String(candidate.language || '').toUpperCase() === bulkLanguage.toUpperCase()
+          );
+          const { id: _sourceId, ...sourceRecord } = cv;
+          const translatedRecord = {
+            ...sourceRecord,
+            mode: bulkCvMode,
+            language: bulkLanguage,
+            expertData: translatedExpert,
+            translatedFromLanguage: cv.language || 'English',
+          };
+          if (existing) await api.updateCV({ ...existing, ...translatedRecord, id: existing.id });
+          else await api.saveCV(translatedRecord);
+        } catch (error: any) {
+          failures.push(`${cv.expertName || 'Expert'}: ${error.message}`);
+        }
+      }
+
+      if (Object.keys(zip.files).length === 0) throw new Error('No translated CVs could be generated.');
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, `Global_Matches_${bulkCvMode}_${safeFilePart(bulkLanguage, 'Translated')}_${Date.now()}.zip`);
+      setCvs(await api.getCVs());
+      updateTask(taskId, {
+        status: failures.length === targets.length ? 'error' : 'completed',
+        percent: 100,
+        eta: 0,
+        message: failures.length
+          ? `Translated ${targets.length - failures.length}/${targets.length}; ${failures.length} failed.`
+          : `Translated ${targets.length}/${targets.length} CVs.`,
+      });
+      if (failures.length) alert(`Some translations failed:\n${failures.join('\n')}`);
+    } catch (error: any) {
+      updateTask(taskId, { status: 'error', message: error.message });
+      alert(`Bulk translation failed: ${error.message}`);
+    } finally {
+      setIsBulkActionRunning(false);
+    }
+  };
+
+  const handleBulkPreview = async () => {
+    const targets = requireSelectedVersionCvs();
+    if (targets.length === 0) return;
+    setBulkPreviewQueue(targets);
+    setBulkPreviewIndex(0);
+    await handlePreview(targets[0]);
   };
 
   const handleGenerateCV = async (match: any) => {
@@ -531,7 +810,9 @@ export default function MatchResults() {
       });
 
       // 3. Save metadata to Generated CVs list
-      await api.saveCV({
+      const normalRecord = {
+        matchId: match.id,
+        mode: "NORMAL",
         expertId: match.expertId,
         expertName: match.expertName,
         tenderId: match.tenderId,
@@ -544,7 +825,11 @@ export default function MatchResults() {
         strong_points: match.strong_points,
         risk_level: match.risk_level,
         template: selectedTemplate,
-      });
+      };
+      const existingNormal = storedCvForMode(match, 'NORMAL');
+      if (existingNormal) await api.updateCV({ ...existingNormal, ...normalRecord, id: existingNormal.id });
+      else await api.saveCV(normalRecord);
+      setCvs(await api.getCVs());
 
       doc.save(
         `${selectedTemplate}_CV_${(match.expertName || "Unnamed").split(" ").join("_")}.pdf`,
@@ -571,22 +856,8 @@ export default function MatchResults() {
   const handleAdaptCV = async (cv: any) => {
     setAdaptingId(cv.id);
     try {
-      let currentCv = { ...cv };
-      if (cv.id && cv.id.startsWith("phantom-")) {
-        const res = await api.saveCV({
-          expertId: cv.expertId,
-          expertName: cv.expertName,
-          tenderId: cv.tenderId,
-          tenderName: cv.tenderName,
-          positionId: cv.positionId,
-          positionTitle: cv.positionTitle,
-          language: "English",
-          template: cv.template || "General",
-        });
-        if (res.success && res.cv) {
-          currentCv = res.cv;
-        }
-      }
+      const currentCv = { ...cv };
+      const existingModeCv = storedCvForMode(cv, 'ADAPT');
 
       const experts = await api.getExperts();
       const expert = experts.find(
@@ -620,21 +891,22 @@ export default function MatchResults() {
         `${currentCv.template || "General"} - ${adaptedExpert.fullName || adaptedExpert.name || "Expert"} (Adapted).pdf`,
       );
 
-      const updatedCvRes = await api.updateCV({
-        ...currentCv,
+      const { id: _sourceId, ...sourceData } = currentCv;
+      const payload = {
+        ...sourceData,
+        matchId: currentCv.matchId || (currentCv.id?.startsWith('phantom-') ? currentCv.id.split('-').slice(1, -1).join('-') : undefined),
+        mode: 'ADAPT',
         expertData: adaptedExpert,
         customRichText: undefined,
         isAdapted: true,
         isRendered: false,
-      });
-
-      setCvs(prev => {
-        const next = [...prev];
-        const idx = next.findIndex(c => c.id === currentCv.id);
-        if (idx >= 0) next[idx] = updatedCvRes || { ...currentCv, isAdapted: true };
-        else next.push(updatedCvRes || { ...currentCv, isAdapted: true });
-        return next;
-      });
+      };
+      if (existingModeCv) {
+        await api.updateCV({ ...existingModeCv, ...payload, id: existingModeCv.id });
+      } else {
+        await api.saveCV(payload);
+      }
+      setCvs(await api.getCVs());
       alert('CV successfully adapted to tender requirements!');
     } catch (e) {
       console.error(e);
@@ -647,22 +919,8 @@ export default function MatchResults() {
   const handleRenderCV = async (cv: any) => {
     setRenderingId(cv.id);
     try {
-      let currentCv = { ...cv };
-      if (cv.id && cv.id.startsWith("phantom-")) {
-        const res = await api.saveCV({
-          expertId: cv.expertId,
-          expertName: cv.expertName,
-          tenderId: cv.tenderId,
-          tenderName: cv.tenderName,
-          positionId: cv.positionId,
-          positionTitle: cv.positionTitle,
-          language: "English",
-          template: cv.template || "General",
-        });
-        if (res.success && res.cv) {
-          currentCv = res.cv;
-        }
-      }
+      const currentCv = { ...cv };
+      const existingModeCv = storedCvForMode(cv, 'RENDER');
 
       const experts = await api.getExperts();
       const expert = experts.find(
@@ -695,22 +953,22 @@ export default function MatchResults() {
         `${currentCv.template || "General"} - ${renderedExpert.fullName || renderedExpert.name || "Expert"} (Rendered).pdf`,
       );
 
-      // Update local storage with the AI-rendered version
-      const updatedCvRes = await api.updateCV({
-        ...currentCv,
+      const { id: _sourceId, ...sourceData } = currentCv;
+      const payload = {
+        ...sourceData,
+        matchId: currentCv.matchId || (currentCv.id?.startsWith('phantom-') ? currentCv.id.split('-').slice(1, -1).join('-') : undefined),
+        mode: 'RENDER',
         expertData: renderedExpert,
         customRichText: undefined,
         isAdapted: true,
         isRendered: true,
-      });
-
-      setCvs(prev => {
-        const next = [...prev];
-        const idx = next.findIndex(c => c.id === currentCv.id);
-        if (idx >= 0) next[idx] = updatedCvRes || { ...currentCv, isAdapted: true, isRendered: true };
-        else next.push(updatedCvRes || { ...currentCv, isAdapted: true, isRendered: true });
-        return next;
-      });
+      };
+      if (existingModeCv) {
+        await api.updateCV({ ...existingModeCv, ...payload, id: existingModeCv.id });
+      } else {
+        await api.saveCV(payload);
+      }
+      setCvs(await api.getCVs());
       alert('CV successfully rendered to 100% capacity!');
     } catch (e) {
       console.error(e);
@@ -736,6 +994,8 @@ export default function MatchResults() {
            tenderName: cv.tenderName,
            positionId: cv.positionId,
            positionTitle: cv.positionTitle,
+           matchId: cv.matchId,
+           mode: cvMode(cv),
            language: 'English',
            template: cv.template || 'General',
            certification: cv.certification,
@@ -761,6 +1021,25 @@ export default function MatchResults() {
       });
       const expertName = translatedExpert.fullName || translatedExpert.name || 'Expert';
       doc.save(`${cv.template || 'General'} - ${expertName} (${lang}).pdf`);
+      const translatedExisting = cvs.find((candidate: any) =>
+        matchesCvIdentity(candidate, cv) &&
+        cvMode(candidate) === cvMode(cv) &&
+        String(candidate.language || '').toUpperCase() === lang.toUpperCase()
+      );
+      const translatedPayload = {
+        ...cv,
+        id: translatedExisting?.id,
+        mode: cvMode(cv),
+        language: lang,
+        expertData: translatedExpert,
+        translatedFromLanguage: cv.language || 'English',
+      };
+      if (translatedExisting) await api.updateCV(translatedPayload);
+      else {
+        delete translatedPayload.id;
+        await api.saveCV(translatedPayload);
+      }
+      setCvs(await api.getCVs());
     } catch (err: any) {
       console.error(err);
       alert("Translation failed: " + err.message);
@@ -783,7 +1062,7 @@ export default function MatchResults() {
       updateTask(taskId, { percent: currentPercent, eta: 10 });
     }, 1000);
     try {
-      const expert = allExperts.find(e => e.id === cv.expertId || e.name === cv.expertName);
+      const expert = expertForCv(cv);
       if (!expert) throw new Error("Expert data not found for regeneration");
       
       const tender = tenders.find(t => t.id === cv.tenderId);
@@ -810,6 +1089,8 @@ export default function MatchResults() {
                tenderName: cv.tenderName,
                positionId: cv.positionId,
                positionTitle: cv.positionTitle,
+               matchId: cv.matchId,
+               mode: cvMode(cv),
                language: 'English',
                template: cv.template || 'General',
                customBranding: customBranding
@@ -825,6 +1106,8 @@ export default function MatchResults() {
            tenderName: cv.tenderName,
            positionId: cv.positionId,
            positionTitle: cv.positionTitle,
+           matchId: cv.matchId,
+           mode: cvMode(cv),
            language: 'English',
            template: cv.template || 'General'
          });
@@ -847,7 +1130,7 @@ export default function MatchResults() {
         downloadHtmlAsDocx(cv.customRichText, `CV_${cv.expertName || 'Expert'}`);
         return;
       }
-      const expert = allExperts.find(e => e.id === cv.expertId || e.name === cv.expertName);
+      const expert = expertForCv(cv);
       if (!expert) {
         alert("Expert data missing. Cannot download CV.");
         return;
@@ -861,6 +1144,8 @@ export default function MatchResults() {
            tenderName: cv.tenderName,
            positionId: cv.positionId,
            positionTitle: cv.positionTitle,
+           matchId: cv.matchId,
+           mode: cvMode(cv),
            language: 'English',
            template: cv.template || 'General'
          });
@@ -887,7 +1172,7 @@ export default function MatchResults() {
         await downloadHtmlAsPdf(cv.customRichText, `CV_${cv.expertName || 'Expert'}`);
         return;
       }
-      const expert = allExperts.find(e => e.id === cv.expertId || e.name === cv.expertName);
+      const expert = expertForCv(cv);
       if (!expert) {
         alert("Expert data missing. Cannot download CV.");
         return;
@@ -900,6 +1185,8 @@ export default function MatchResults() {
            tenderName: cv.tenderName,
            positionId: cv.positionId,
            positionTitle: cv.positionTitle,
+           matchId: cv.matchId,
+           mode: cvMode(cv),
            language: 'English',
            template: cv.template || 'General'
          });
@@ -922,7 +1209,7 @@ export default function MatchResults() {
 
   const handlePreview = async (cv: any) => {
     try {
-      const expert = allExperts.find(e => e.id === cv.expertId || e.name === cv.expertName) || {};
+      const expert = expertForCv(cv) || {};
 
       let currentCv = { ...cv };
       if (cv.id && cv.id.startsWith('phantom-')) {
@@ -933,6 +1220,8 @@ export default function MatchResults() {
            tenderName: cv.tenderName,
            positionId: cv.positionId,
            positionTitle: cv.positionTitle,
+           matchId: cv.matchId,
+           mode: cvMode(cv),
            language: 'English',
            template: cv.template || 'General',
            certification: cv.certification,
@@ -956,6 +1245,7 @@ export default function MatchResults() {
       });
       const pdfBlob = doc.output('blob');
       const url = URL.createObjectURL(pdfBlob);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(url);
     } catch (err: any) {
       console.error(err);
@@ -963,11 +1253,20 @@ export default function MatchResults() {
     }
   };
 
+  const showBulkPreviewAt = async (index: number) => {
+    const cv = bulkPreviewQueue[index];
+    if (!cv) return;
+    setBulkPreviewIndex(index);
+    await handlePreview(cv);
+  };
+
   const closePreview = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setPreviewCv(null);
     setIsEditingRichText(false);
+    setBulkPreviewQueue([]);
+    setBulkPreviewIndex(0);
   };
 
   const saveRichText = async () => {
@@ -1049,6 +1348,87 @@ export default function MatchResults() {
           </div>
         </div>
       </div>
+
+      {selectedMatchIds.length > 0 && (
+        <div className="sticky top-3 z-30 rounded-xl border border-blue-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white">
+                {selectedMatchIds.length} selected
+              </span>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                CV version
+                <select
+                  value={bulkCvMode}
+                  onChange={(event) => setBulkCvMode(event.target.value as CvMode)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-500"
+                >
+                  <option value="NORMAL">Normal CV</option>
+                  <option value="ADAPT">Adapted CV</option>
+                  <option value="RENDER">Rendered CV</option>
+                </select>
+              </label>
+              <button
+                onClick={() => void handleBulkPreview()}
+                disabled={isBulkGenerating}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Eye size={14} /> View
+              </button>
+              <button
+                onClick={() => void handleBulkPackage('pdf', true)}
+                disabled={isBulkGenerating}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <RefreshCw size={14} /> Regenerate
+              </button>
+              <button
+                onClick={() => void handleBulkPackage('word')}
+                disabled={isBulkGenerating}
+                className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+              >
+                <FileIcon size={14} /> Word ZIP
+              </button>
+              <button
+                onClick={() => void handleBulkPackage('pdf')}
+                disabled={isBulkGenerating}
+                className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              >
+                <Download size={14} /> PDF ZIP
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={bulkLanguage}
+                onChange={(event) => setBulkLanguage(event.target.value)}
+                disabled={isBulkGenerating}
+                className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 outline-none focus:border-blue-500 disabled:opacity-50"
+              >
+                <option value="">Translation language</option>
+                {translationLanguages
+                  .filter((option) => option.code !== 'ENGLISH')
+                  .map((option) => <option key={option.code} value={option.label}>{option.label}</option>)}
+              </select>
+              <button
+                onClick={() => void handleBulkTranslate()}
+                disabled={isBulkGenerating || !bulkLanguage}
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isBulkActionRunning ? <Loader2 size={14} className="animate-spin" /> : <Languages size={14} />}
+                Translate
+              </button>
+              <button
+                onClick={() => setSelectedMatchIds([])}
+                disabled={isBulkGenerating}
+                className="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-50"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-slate-50/50 w-full">
@@ -1502,11 +1882,11 @@ export default function MatchResults() {
                                    {/* CV ACTIONS - Extracted dynamically from original elementCode */}
                                    <div className="flex-shrink-0 w-full md:w-[240px] flex flex-col gap-3">
                                       {(() => {
-                                        const cvsForMatch = cvs.filter((c: any) => c.expertId === match.expertId && (c.positionId === match.positionId || c.positionTitle === match.positionTitle));
-                                        let visualCv = cvsForMatch[cvsForMatch.length - 1] || cvsForMatch[0] || match;
-                                        if (cvsForMatch.length > 0 && cvsForMatch.some((c:any) => c.customRichText)) {
-                                            visualCv = cvsForMatch.find((c:any) => c.customRichText) || visualCv;
-                                        }
+                                        const visualCv = cvForMode(match, 'NORMAL') || phantomCvForMode(match, 'NORMAL');
+                                        const adaptedCv = cvForMode(match, 'ADAPT');
+                                        const renderedCv = cvForMode(match, 'RENDER');
+                                        const adaptActionCv = adaptedCv || visualCv;
+                                        const renderActionCv = renderedCv || visualCv;
                                         return (
                                           <div className="flex flex-col gap-2 w-full sm:w-[220px]">
                                                              <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 mt-1">
@@ -1547,36 +1927,44 @@ export default function MatchResults() {
                                                                   Translate
                                                                 </button>
                                                               </div>
-                                                                                                                      <h5 className="text-[11px] font-bold uppercase tracking-wider text-indigo-500 mb-1">
+                                                             <h5 className="text-[11px] font-bold uppercase tracking-wider text-indigo-500 mb-1">
                                                                Adapt CV
                                                              </h5>
                                                              <button
-                                                               onClick={(e) => { e.stopPropagation(); handleAdaptCV(visualCv); }}
-                                                               disabled={adaptingId === visualCv.id || renderingId === visualCv.id}
+                                                               onClick={(e) => { e.stopPropagation(); handleAdaptCV(adaptActionCv); }}
+                                                               disabled={adaptingId === adaptActionCv.id || renderingId === adaptActionCv.id}
                                                                className="flex items-center justify-center gap-2 w-full px-4 py-2 border border-indigo-200 bg-indigo-50 text-indigo-800 rounded-lg hover:bg-indigo-100 transition-all shadow-sm focus:ring-2 focus:ring-indigo-500 font-semibold text-xs disabled:opacity-50 mb-1"
                                                              >
-                                                               {adaptingId === visualCv.id ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
-                                                               {visualCv.isAdapted ? "Re-Adapt CV" : "Adapt CV"}
+                                                               {adaptingId === adaptActionCv.id ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+                                                               {adaptedCv ? "Re-Adapt CV" : "Adapt CV"}
                                                              </button>
-                                                             <div className="grid grid-cols-3 gap-1.5 w-full">
+                                                             <div className="grid grid-cols-2 gap-1.5 w-full">
                                                                <button
-                                                                 onClick={(e) => { e.stopPropagation(); handlePreview(visualCv); }}
-                                                                 disabled={!visualCv.isAdapted}
+                                                                 onClick={(e) => { e.stopPropagation(); if (adaptedCv) handlePreview(adaptedCv); }}
+                                                                 disabled={!adaptedCv}
                                                                  className="flex items-center gap-1.5 p-1.5 justify-center border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors shadow-sm text-[10px] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
                                                                  title="View CV"
                                                                >
                                                                  <Eye size={12} /> View
                                                                </button>
                                                                <button
-                                                                 onClick={(e) => { e.stopPropagation(); handleDownloadDocx(visualCv); }}
-                                                                 disabled={!visualCv.isAdapted}
+                                                                 onClick={(e) => { e.stopPropagation(); if (adaptedCv) setCvToRegenerate(adaptedCv); }}
+                                                                 disabled={!adaptedCv}
+                                                                 className="flex items-center gap-1.5 p-1.5 justify-center border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors shadow-sm text-[10px] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
+                                                                 title="Regenerate CV"
+                                                               >
+                                                                 <RefreshCw size={12} /> Regenerate
+                                                               </button>
+                                                               <button
+                                                                 onClick={(e) => { e.stopPropagation(); if (adaptedCv) handleDownloadDocx(adaptedCv); }}
+                                                                 disabled={!adaptedCv}
                                                                  className="flex items-center gap-1.5 p-1.5 justify-center border border-blue-200 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors shadow-sm text-[10px] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200"
                                                                >
                                                                  <FileIcon size={12} /> Word
                                                                </button>
                                                                <button
-                                                                 onClick={(e) => { e.stopPropagation(); handleDownloadPdf(visualCv); }}
-                                                                 disabled={!visualCv.isAdapted}
+                                                                 onClick={(e) => { e.stopPropagation(); if (adaptedCv) handleDownloadPdf(adaptedCv); }}
+                                                                 disabled={!adaptedCv}
                                                                  className="flex items-center gap-1.5 p-1.5 justify-center border border-red-200 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors shadow-sm text-[10px] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200"
                                                                >
                                                                  <Download size={12} /> PDF
@@ -1585,22 +1973,22 @@ export default function MatchResults() {
 
                                                               <div className="flex items-center gap-1.5 w-full border border-blue-200 rounded-lg p-1 bg-blue-50/50 shadow-sm mt-1.5 mb-2">
                                                                 <select
-                                                                  value={targetLang[visualCv.id] || ""}
-                                                                  onChange={(e) => { e.stopPropagation(); setTargetLang((prev) => ({ ...prev, [visualCv.id]: e.target.value })); }}
+                                                                  value={adaptedCv ? targetLang[adaptedCv.id] || "" : ""}
+                                                                  onChange={(e) => { e.stopPropagation(); if (adaptedCv) setTargetLang((prev) => ({ ...prev, [adaptedCv.id]: e.target.value })); }}
                                                                   onClick={(e) => e.stopPropagation()}
-                                                                  disabled={!visualCv.isAdapted}
+                                                                  disabled={!adaptedCv}
                                                                   className="text-[10px] uppercase font-bold bg-transparent outline-none text-blue-700 flex-1 px-1 cursor-pointer w-full min-w-[80px] disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 >
                                                                   <option value="">Language</option>
                                                                   {translationLanguages.map(option => <option key={option.code} value={option.label}>{option.label}</option>)}
                                                                 </select>
                                                                 <button
-                                                                  onClick={(e) => { e.stopPropagation(); handleTranslateCV(visualCv); }}
-                                                                  disabled={translatingId === visualCv.id || !targetLang[visualCv.id] || !visualCv.isAdapted}
+                                                                  onClick={(e) => { e.stopPropagation(); if (adaptedCv) handleTranslateCV(adaptedCv); }}
+                                                                  disabled={!adaptedCv || translatingId === adaptedCv?.id || (adaptedCv ? !targetLang[adaptedCv.id] : true)}
                                                                   className="flex items-center justify-center gap-1.5 p-1 px-2 text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                                   title="Translate Current CV Version"
                                                                 >
-                                                                  {translatingId === visualCv.id ? <Loader2 size={12} className="animate-spin" /> : <Languages size={12} />}
+                                                                  {translatingId === adaptedCv?.id ? <Loader2 size={12} className="animate-spin" /> : <Languages size={12} />}
                                                                   Translate
                                                                 </button>
                                                               </div>
@@ -1611,36 +1999,66 @@ export default function MatchResults() {
                                                                Render CV
                                                              </h5>
                                                              <button
-                                                               onClick={(e) => { e.stopPropagation(); handleRenderCV(visualCv); }}
-                                                               disabled={renderingId === visualCv.id || adaptingId === visualCv.id}
+                                                               onClick={(e) => { e.stopPropagation(); handleRenderCV(renderActionCv); }}
+                                                               disabled={renderingId === renderActionCv.id || adaptingId === renderActionCv.id}
                                                                className="flex items-center justify-center gap-2 w-full px-4 py-2 border border-emerald-200 bg-emerald-50 text-emerald-800 rounded-lg hover:bg-emerald-100 transition-all shadow-sm focus:ring-2 focus:ring-emerald-500 font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed mb-1"
                                                              >
-                                                               {renderingId === visualCv.id ? <Loader2 size={16} className="animate-spin" /> : <BrainCircuit size={16} />}
-                                                               {visualCv.isRendered ? "Re-Render CV" : "Render CV"}
+                                                               {renderingId === renderActionCv.id ? <Loader2 size={16} className="animate-spin" /> : <BrainCircuit size={16} />}
+                                                               {renderedCv ? "Re-Render CV" : "Render CV"}
                                                              </button>
-                                                             <div className="grid grid-cols-3 gap-1.5 w-full">
+                                                             <div className="grid grid-cols-2 gap-1.5 w-full">
                                                                <button
-                                                                 onClick={(e) => { e.stopPropagation(); handlePreview(visualCv); }}
-                                                                 disabled={!visualCv.isRendered}
+                                                                 onClick={(e) => { e.stopPropagation(); if (renderedCv) handlePreview(renderedCv); }}
+                                                                 disabled={!renderedCv}
                                                                  className="flex items-center gap-1.5 p-1.5 justify-center border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors shadow-sm text-[10px] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
                                                                >
                                                                  <Eye size={12} /> View
                                                                </button>
                                                                <button
-                                                                 onClick={(e) => { e.stopPropagation(); handleDownloadDocx(visualCv); }}
-                                                                 disabled={!visualCv.isRendered}
+                                                                 onClick={(e) => { e.stopPropagation(); if (renderedCv) setCvToRegenerate(renderedCv); }}
+                                                                 disabled={!renderedCv}
+                                                                 className="flex items-center gap-1.5 p-1.5 justify-center border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors shadow-sm text-[10px] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
+                                                                 title="Regenerate CV"
+                                                               >
+                                                                 <RefreshCw size={12} /> Regenerate
+                                                               </button>
+                                                               <button
+                                                                 onClick={(e) => { e.stopPropagation(); if (renderedCv) handleDownloadDocx(renderedCv); }}
+                                                                 disabled={!renderedCv}
                                                                  className="flex items-center gap-1.5 p-1.5 justify-center border border-blue-200 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors shadow-sm text-[10px] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200"
                                                                >
                                                                  <FileIcon size={12} /> Word
                                                                </button>
                                                                <button
-                                                                 onClick={(e) => { e.stopPropagation(); handleDownloadPdf(visualCv); }}
-                                                                 disabled={!visualCv.isRendered}
+                                                                 onClick={(e) => { e.stopPropagation(); if (renderedCv) handleDownloadPdf(renderedCv); }}
+                                                                 disabled={!renderedCv}
                                                                  className="flex items-center gap-1.5 p-1.5 justify-center border border-red-200 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors shadow-sm text-[10px] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200"
                                                                >
                                                                  <Download size={12} /> PDF
                                                                 </button>
                                                                </div>
+
+                                                              <div className="flex items-center gap-1.5 w-full border border-blue-200 rounded-lg p-1 bg-blue-50/50 shadow-sm mt-1.5 mb-2">
+                                                                <select
+                                                                  value={renderedCv ? targetLang[renderedCv.id] || "" : ""}
+                                                                  onChange={(e) => { e.stopPropagation(); if (renderedCv) setTargetLang((prev) => ({ ...prev, [renderedCv.id]: e.target.value })); }}
+                                                                  onClick={(e) => e.stopPropagation()}
+                                                                  disabled={!renderedCv}
+                                                                  className="text-[10px] uppercase font-bold bg-transparent outline-none text-blue-700 flex-1 px-1 cursor-pointer w-full min-w-[80px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                >
+                                                                  <option value="">Language</option>
+                                                                  {translationLanguages.map(option => <option key={option.code} value={option.label}>{option.label}</option>)}
+                                                                </select>
+                                                                <button
+                                                                  onClick={(e) => { e.stopPropagation(); if (renderedCv) handleTranslateCV(renderedCv); }}
+                                                                  disabled={!renderedCv || translatingId === renderedCv?.id || (renderedCv ? !targetLang[renderedCv.id] : true)}
+                                                                  className="flex items-center justify-center gap-1.5 p-1 px-2 text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                  title="Translate Current CV Version"
+                                                                >
+                                                                  {translatingId === renderedCv?.id ? <Loader2 size={12} className="animate-spin" /> : <Languages size={12} />}
+                                                                  Translate
+                                                                </button>
+                                                              </div>
                                                               
                                                             </div>
                                         );
@@ -1803,6 +2221,29 @@ export default function MatchResults() {
                   <span className="text-sm font-bold text-white">
                     CV_{previewCv.expertName?.split(" ").join("_")}
                   </span>
+                  {bulkPreviewQueue.length > 1 && (
+                    <div className="ml-2 flex items-center gap-1 rounded-lg bg-slate-800 p-1">
+                      <button
+                        onClick={() => void showBulkPreviewAt(bulkPreviewIndex - 1)}
+                        disabled={bulkPreviewIndex === 0}
+                        className="rounded p-1 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-30"
+                        title="Previous selected CV"
+                      >
+                        <ArrowLeft size={14} />
+                      </button>
+                      <span className="min-w-14 text-center text-[11px] font-semibold text-slate-300">
+                        {bulkPreviewIndex + 1} / {bulkPreviewQueue.length}
+                      </span>
+                      <button
+                        onClick={() => void showBulkPreviewAt(bulkPreviewIndex + 1)}
+                        disabled={bulkPreviewIndex >= bulkPreviewQueue.length - 1}
+                        className="rounded p-1 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-30"
+                        title="Next selected CV"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button

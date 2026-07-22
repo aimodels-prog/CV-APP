@@ -21,7 +21,7 @@ export async function downloadHtmlAsPdf(htmlContent: string, filename: string, a
   }
 }
 
-export function downloadHtmlAsDocx(htmlContent: string, filename: string) {
+export function createHtmlDocBlob(htmlContent: string, filename: string): Blob {
   const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
 <meta charset='utf-8'>
@@ -35,12 +35,18 @@ export function downloadHtmlAsDocx(htmlContent: string, filename: string) {
 <body>`;
   const footer = `</body></html>`;
   const sourceHTML = header + htmlContent + footer;
+  return new Blob([sourceHTML], { type: 'application/msword;charset=utf-8' });
+}
+
+export function downloadHtmlAsDocx(htmlContent: string, filename: string) {
+  const blob = createHtmlDocBlob(htmlContent, filename);
   
-  const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+  const source = URL.createObjectURL(blob);
   const fileDownload = document.createElement("a");
   document.body.appendChild(fileDownload);
   fileDownload.href = source;
   fileDownload.download = `${filename}.doc`;
   fileDownload.click();
   document.body.removeChild(fileDownload);
+  URL.revokeObjectURL(source);
 }

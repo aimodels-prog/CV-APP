@@ -11,8 +11,7 @@ import { Image,
   RefreshCw,
   Save,
   Folder,
-  LayoutDashboard,
-  DatabaseBackup
+  LayoutDashboard
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useReferenceData } from '../lib/ReferenceDataContext';
@@ -29,8 +28,6 @@ export default function Settings() {
   const [folderId, setFolderId] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [isSaved, setIsSaved] = useState(false);
-  const [databaseHealth, setDatabaseHealth] = useState<any | null>(null);
-
   const [brandings, setBrandings] = useState<any[]>([]);
   const [newBranding, setNewBranding] = useState({ name: '', header_base64: '', footer_base64: '' });
   
@@ -69,11 +66,10 @@ export default function Settings() {
         return;
       }
 
-      const [config, tax, savedModules, health] = await Promise.all([
+      const [config, tax, savedModules] = await Promise.all([
         api.getGoogleDriveSettings(),
         api.getTaxonomy(),
         api.getAppSetting('hidden-modules', ['matches', 'generated-cvs']),
-        api.health(),
         loadBrandings(),
       ]);
       if (config) {
@@ -82,7 +78,6 @@ export default function Settings() {
       }
       setTaxonomy(tax);
       if (Array.isArray(savedModules)) setHiddenModules(savedModules);
-      setDatabaseHealth(health);
       setLoading(false);
     }
     void load();
@@ -90,7 +85,11 @@ export default function Settings() {
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    const adminTabs = new Set(['taxonomy', 'users', 'branding', 'integrations', 'modules', 'data-backup']);
+    if (tab === 'data-backup') {
+      setActiveTab('profile');
+      return;
+    }
+    const adminTabs = new Set(['taxonomy', 'users', 'branding', 'integrations', 'modules']);
     if (tab && (!adminTabs.has(tab) || isAdmin)) {
       setActiveTab(tab);
     } else if (tab && currentUser) {
@@ -222,17 +221,6 @@ export default function Settings() {
                 <LayoutDashboard size={16} />
                 Modules
               </button>
-              <button
-                onClick={() => setActiveTab('data-backup')}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'data-backup'
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                }`}
-              >
-                <DatabaseBackup size={16} />
-                Database
-              </button>
                 </>
               )}
             </div>
@@ -241,23 +229,6 @@ export default function Settings() {
 
         {/* Main Content */}
         <div className="flex-1">
-          {isAdmin && activeTab === 'data-backup' && (
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-              <div className="max-w-3xl">
-                <h3 className="text-lg font-semibold text-slate-900">PostgreSQL Database</h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Stage 6 is active. All application records, settings, preferences, and drafts are stored in PostgreSQL.
-                </p>
-                <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-5 text-sm text-green-900">
-                  <p className="font-semibold">Database connection active</p>
-                  <p className="mt-2">Database: {databaseHealth?.database || 'Checking...'}</p>
-                  <p>PostgreSQL: {databaseHealth?.postgresVersion || 'Checking...'}</p>
-                  <p>Applied migrations: {databaseHealth?.appliedMigrations ?? 'Checking...'}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {isAdmin && activeTab === 'modules' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
               <div className="flex items-start justify-between mb-6">
