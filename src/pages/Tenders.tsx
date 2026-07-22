@@ -622,13 +622,13 @@ export default function Tenders() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <button
             onClick={() => setIsImportModalOpen(true)}
             className="flex justify-center items-center gap-2 px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
           >
-            <FileSpreadsheet size={16} />
-            Import CSV Text
+            <FileText size={16} />
+            Import Notebook Tender Text
           </button>
           <button
             onClick={handleDownloadTemplate}
@@ -974,8 +974,8 @@ export default function Tenders() {
                           onClick={() => setIsImportModalOpen(true)}
                           className="flex justify-center items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium transition-colors cursor-pointer w-auto"
                         >
-                          <FileSpreadsheet size={16} />
-                          Import CSV Text
+                          <FileText size={16} />
+                          Import Notebook Tender Text
                         </button>
                         <button
                           onClick={handleDownloadTemplate}

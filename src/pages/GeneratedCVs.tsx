@@ -126,7 +126,7 @@ export default function GeneratedCVs() {
 
       updateTask(taskId, { message: "Rendering branded PDF...", percent: 80 });
       const doc = await generateReformatedCV({
-        template: cv.template || "Specialized",
+        template: cv.template || "General",
         branding: resolveOutputBranding(customBranding, tender?.branding),
         expert: expert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
@@ -189,7 +189,7 @@ export default function GeneratedCVs() {
       const translatedExpert = await translateExpertData(expertToTranslate, lang);
 
       const doc = await generateReformatedCV({
-        template: cv.template || "Specialized",
+        template: cv.template || "General",
         branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert: translatedExpert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
@@ -305,10 +305,13 @@ export default function GeneratedCVs() {
 
   const handleDownloadDocx = async (cv: any) => {
     try {
+      const tender = await api.getTender(cv.tenderId);
+      const branding = resolveOutputBranding(cv.customBranding, tender?.branding);
       if (cv.customRichText) {
         downloadHtmlAsDocx(
           cv.customRichText,
           `CV_${cv.expertName || "Expert"}`,
+          branding,
         );
         return;
       }
@@ -324,12 +327,11 @@ export default function GeneratedCVs() {
       }
 
       const { generateDocxCV } = await import("../lib/docx");
-      const tender = await api.getTender(cv.tenderId);
 
       await generateDocxCV({
-        template: cv.template || "Specialized",
+        template: cv.template || "General",
         expert: expert,
-        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
+        branding,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
       });
     } catch (err: any) {
@@ -340,10 +342,14 @@ export default function GeneratedCVs() {
 
   const handleDownload = async (cv: any) => {
     try {
+      const tender = await api.getTender(cv.tenderId);
+      const branding = resolveOutputBranding(cv.customBranding, tender?.branding);
       if (cv.customRichText) {
         await downloadHtmlAsPdf(
           cv.customRichText,
           `CV_${cv.expertName || "Expert"}`,
+          false,
+          branding,
         );
         return;
       }
@@ -351,22 +357,20 @@ export default function GeneratedCVs() {
       const expert = experts.find(
         (e) => e.id === cv.expertId || e.name === cv.expertName,
       );
-      const tender = await api.getTender(cv.tenderId);
-
       if (!expert) {
         alert("Expert data missing. Cannot download CV.");
         return;
       }
 
       const doc = await generateReformatedCV({
-        template: cv.template || "Specialized",
-        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
+        template: cv.template || "General",
+        branding,
         expert: expert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
       });
 
       const expertName = cv.expertName || "Expert";
-      doc.save(`${cv.template || "Specialized"} - ${expertName}.pdf`);
+      doc.save(`${cv.template || "General"} - ${expertName}.pdf`);
     } catch (err: any) {
       console.error(err);
       alert("Download failed: " + err.message);
@@ -384,7 +388,7 @@ export default function GeneratedCVs() {
       setPreviewCv({ ...cv, expertData: expert });
 
       const doc = await generateReformatedCV({
-        template: cv.template || "Specialized",
+        template: cv.template || "General",
         branding: resolveOutputBranding(cv.customBranding, tender?.branding),
         expert: expert,
         position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
@@ -808,6 +812,8 @@ export default function GeneratedCVs() {
 
       for (let i = 0; i < targets.length; i++) {
         const cv = targets[i];
+        const tender = await api.getTender(cv.tenderId);
+        const branding = resolveOutputBranding(cv.customBranding, tender?.branding);
         updateTask(taskId, {
           message: `Generating PDF for ${cv.expertName}... (${i + 1}/${targets.length})`,
         });
@@ -817,16 +823,16 @@ export default function GeneratedCVs() {
             cv.customRichText,
             `CV_${cv.expertName}`,
             true,
+            branding,
           );
           zip.file(
             `CV_${cv.expertName.split(" ").join("_")}.pdf`,
             docBlob as Blob,
           );
         } else {
-          const tender = await api.getTender(cv.tenderId);
           const doc = await generateReformatedCV({
             template: cv.template || "General",
-            branding: resolveOutputBranding(cv.customBranding, tender?.branding),
+            branding,
             expert: cv.expertData,
             position_title: cv.positionTitle || cv.positionId, certification: cv.certification,
           });

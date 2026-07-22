@@ -260,19 +260,21 @@ export default function MatchResults() {
     tenders.find((tender) => tender.id === cv.tenderId) || api.getTender(cv.tenderId);
 
   const buildPdfBlob = async (cv: any, expertOverride?: any): Promise<Blob> => {
+    const tender = await tenderForCv(cv);
+    const branding = resolveOutputBranding(cv.customBranding, tender?.branding);
     if (cv.customRichText) {
       return await downloadHtmlAsPdf(
         cv.customRichText,
         `CV_${safeFilePart(cv.expertName, 'Expert')}`,
         true,
+        branding,
       ) as Blob;
     }
     const expert = expertOverride || expertForCv(cv);
     if (!expert) throw new Error(`Expert data missing for ${cv.expertName || 'selected CV'}.`);
-    const tender = await tenderForCv(cv);
     const doc = await generateReformatedCV({
       template: cv.template || selectedTemplate,
-      branding: resolveOutputBranding(cv.customBranding, tender?.branding),
+      branding,
       expert,
       position_title: cv.positionTitle || cv.positionId,
       certification: certificationForOutput(cv, tender),
@@ -281,17 +283,22 @@ export default function MatchResults() {
   };
 
   const buildDocxBlob = async (cv: any): Promise<Blob> => {
+    const tender = await tenderForCv(cv);
+    const branding = resolveOutputBranding(cv.customBranding, tender?.branding);
     if (cv.customRichText) {
-      return createHtmlDocBlob(cv.customRichText, `CV_${safeFilePart(cv.expertName, 'Expert')}`);
+      return createHtmlDocBlob(
+        cv.customRichText,
+        `CV_${safeFilePart(cv.expertName, 'Expert')}`,
+        branding,
+      );
     }
     const expert = expertForCv(cv);
     if (!expert) throw new Error(`Expert data missing for ${cv.expertName || 'selected CV'}.`);
-    const tender = await tenderForCv(cv);
     const { generateDocxCV } = await import('../lib/docx');
     return generateDocxCV({
       template: cv.template || selectedTemplate,
       expert,
-      branding: resolveOutputBranding(cv.customBranding, tender?.branding),
+      branding,
       position_title: cv.positionTitle || cv.positionId,
       certification: certificationForOutput(cv, tender),
     }, false);
@@ -1162,8 +1169,14 @@ export default function MatchResults() {
 
   const handleDownloadDocx = async (cv: any) => {
     try {
+      const tender = await tenderForCv(cv);
+      const branding = resolveOutputBranding(cv.customBranding, tender?.branding);
       if (cv.customRichText) {
-        downloadHtmlAsDocx(cv.customRichText, `CV_${cv.expertName || 'Expert'}`);
+        downloadHtmlAsDocx(
+          cv.customRichText,
+          `CV_${cv.expertName || 'Expert'}`,
+          branding,
+        );
         return;
       }
       const expert = expertForCv(cv);
@@ -1187,12 +1200,11 @@ export default function MatchResults() {
          });
          api.getCVs().then(setCvs);
       }
-      const tender = await tenderForCv(cv);
       const { generateDocxCV } = await import('../lib/docx');
       await generateDocxCV({
         template: cv.template || 'General',
         expert,
-        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
+        branding,
         position_title: cv.positionTitle || cv.positionId,
         certification: certificationForOutput(cv, tender),
       });
@@ -1204,8 +1216,15 @@ export default function MatchResults() {
 
   const handleDownloadPdf = async (cv: any) => {
     try {
+      const tender = await tenderForCv(cv);
+      const branding = resolveOutputBranding(cv.customBranding, tender?.branding);
       if (cv.customRichText) {
-        await downloadHtmlAsPdf(cv.customRichText, `CV_${cv.expertName || 'Expert'}`);
+        await downloadHtmlAsPdf(
+          cv.customRichText,
+          `CV_${cv.expertName || 'Expert'}`,
+          false,
+          branding,
+        );
         return;
       }
       const expert = expertForCv(cv);
@@ -1228,10 +1247,9 @@ export default function MatchResults() {
          });
          api.getCVs().then(setCvs);
       }
-      const tender = await tenderForCv(cv);
       const doc = await generateReformatedCV({
         template: cv.template || 'General',
-        branding: resolveOutputBranding(cv.customBranding, tender?.branding),
+        branding,
         expert,
         position_title: cv.positionTitle || cv.positionId,
         certification: certificationForOutput(cv, tender),

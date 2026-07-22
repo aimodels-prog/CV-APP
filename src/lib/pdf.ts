@@ -627,7 +627,9 @@ function generateSpecialized(doc: any, options: PDFExportOptions) {
   const { branding, expert, position_title } = options;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const startX = 20;
+  // Keep legacy documents on the same horizontal grid as General documents
+  // and the uploaded 1800 px branding artwork (180 mm printable width).
+  const startX = 15;
   const contentWidth = pageWidth - startX * 2;
 
   doc.setFont("helvetica", "bold");
@@ -995,14 +997,12 @@ function generateSpecialized(doc: any, options: PDFExportOptions) {
         doc,
         branding.footer_base64,
         startX,
-        275,
+        pageHeight - 20,
         contentWidth,
-        12,
+        18,
       );
     }
 
-    doc.text(`GENERATED CV | FORM TECH-6`, 105, 290, { align: "center" });
-    doc.text(`Page ${i} of ${pageCount}`, 180, 290);
   }
 
   return doc;

@@ -17,7 +17,8 @@ import {
   EditIcon,
   Trash2,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
@@ -521,26 +522,26 @@ export default function Experts() {
         
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <button
+            onClick={() => setIsImportCsvOpen(true)}
+            className="flex justify-center items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
+          >
+            <FileText size={16} />
+            Import Notebook Expert Text
+          </button>
+          <button
             onClick={handleDownloadTemplate}
-            className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm cursor-pointer"
+            className="flex justify-center items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
           >
             <Download size={16} />
             Template
           </button>
-          <button 
-            onClick={() => setIsImportCsvOpen(true)}
-            className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm cursor-pointer"
-          >
-            <FileSpreadsheet size={16} />
-            Import CSV Text
-          </button>
-          <label className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm cursor-pointer">
+          <label className="flex justify-center items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm cursor-pointer w-full sm:w-auto">
             <FileSpreadsheet size={16} />
             Import Excel
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcelUpload} />
           </label>
           <label className={clsx(
-            "flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm cursor-pointer",
+            "flex justify-center items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm cursor-pointer w-full sm:w-auto",
             isUploading && "opacity-50 cursor-not-allowed"
           )}>
             {isUploading ? <Loader2 size={16} className="animate-spin text-slate-500" /> : <Upload size={16} />}
@@ -549,7 +550,7 @@ export default function Experts() {
           </label>
           <button 
             onClick={() => setIsAddExpertOpen(true)}
-            className="flex items-center gap-2 bg-[#2563eb] hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm"
+            className="flex justify-center items-center gap-2 bg-[#2563eb] hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm w-full sm:w-auto"
           >
             <Plus size={16} />
             Add Expert

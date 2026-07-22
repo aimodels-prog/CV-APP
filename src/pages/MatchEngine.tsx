@@ -588,6 +588,7 @@ export default function MatchEngine() {
         downloadHtmlAsDocx(
           cv.customRichText,
           `CV_${cv.expertName || "Expert"}`,
+          resolveOutputBranding(cv.customBranding, tender?.branding),
         );
         return;
       }
@@ -636,6 +637,8 @@ export default function MatchEngine() {
         await downloadHtmlAsPdf(
           cv.customRichText,
           `CV_${cv.expertName || "Expert"}`,
+          false,
+          resolveOutputBranding(cv.customBranding, tender?.branding),
         );
         return;
       }

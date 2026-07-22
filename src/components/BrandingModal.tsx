@@ -25,7 +25,11 @@ export function BrandingModal({ tender, onClose, onSave }: BrandingModalProps) {
       
       // Try to match current tender branding with existing branding profiles
       if (tender.branding?.header_base64 || tender.branding?.footer_base64) {
-        const match = data.find((b: any) => b.header_base64 === tender.branding.header_base64 && b.footer_base64 === tender.branding.footer_base64);
+        const match = data.find((b: any) =>
+          b.id === tender.branding.profile_id ||
+          (b.header_base64 === tender.branding.header_base64 &&
+            b.footer_base64 === tender.branding.footer_base64),
+        );
         if (match) {
           setSelectedBrandingId(match.id);
         }
@@ -38,7 +42,12 @@ export function BrandingModal({ tender, onClose, onSave }: BrandingModalProps) {
     setSelectedBrandingId(id);
     const match = brandings.find(b => b.id === id);
     if (match) {
-      setBranding({ header_base64: match.header_base64, footer_base64: match.footer_base64 });
+      setBranding({
+        profile_id: match.id,
+        profile_name: match.name,
+        header_base64: match.header_base64,
+        footer_base64: match.footer_base64,
+      });
     } else {
       setBranding({ header_base64: "", footer_base64: "" });
     }
@@ -54,6 +63,8 @@ export function BrandingModal({ tender, onClose, onSave }: BrandingModalProps) {
       setBranding((current: any) => ({
         ...current,
         [field]: reader.result as string,
+        profile_id: undefined,
+        profile_name: undefined,
       }));
       setSelectedBrandingId('');
     };
@@ -61,7 +72,12 @@ export function BrandingModal({ tender, onClose, onSave }: BrandingModalProps) {
   };
 
   const removeBrandingImage = (field: 'header_base64' | 'footer_base64') => {
-    setBranding((current: any) => ({ ...current, [field]: '' }));
+    setBranding((current: any) => ({
+      ...current,
+      [field]: '',
+      profile_id: undefined,
+      profile_name: undefined,
+    }));
     setSelectedBrandingId('');
   };
 

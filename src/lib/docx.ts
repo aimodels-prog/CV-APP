@@ -39,6 +39,75 @@ export function cleanText(text: any, preserveNewlines = false): string {
   return result.trim();
 }
 
+function dataUriBytes(dataUrl: string): Uint8Array | null {
+  const match = dataUrl.match(/^data:image\/(png|jpe?g);base64,([\s\S]+)$/i);
+  if (!match) return null;
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function imagePixelSize(dataUrl: string, bytes: Uint8Array) {
+  if (/^data:image\/png/i.test(dataUrl) && bytes.length >= 24) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return { width: view.getUint32(16), height: view.getUint32(20) };
+  }
+
+  if (/^data:image\/jpe?g/i.test(dataUrl)) {
+    let offset = 2;
+    while (offset + 8 < bytes.length) {
+      if (bytes[offset] !== 0xff) {
+        offset += 1;
+        continue;
+      }
+      const marker = bytes[offset + 1];
+      const length = (bytes[offset + 2] << 8) + bytes[offset + 3];
+      if (length < 2) break;
+      if (marker >= 0xc0 && marker <= 0xc3) {
+        return {
+          height: (bytes[offset + 5] << 8) + bytes[offset + 6],
+          width: (bytes[offset + 7] << 8) + bytes[offset + 8],
+        };
+      }
+      offset += length + 2;
+    }
+  }
+
+  return { width: 1, height: 1 };
+}
+
+function brandingImageParagraph(
+  dataUrl: string | undefined,
+  targetWidth: number,
+  maxHeight: number,
+) {
+  if (!dataUrl) return new Paragraph({ children: [] });
+  const bytes = dataUriBytes(dataUrl);
+  if (!bytes) return new Paragraph({ children: [] });
+  const size = imagePixelSize(dataUrl, bytes);
+  const widthScale = targetWidth / Math.max(1, size.width);
+  const heightScale = maxHeight / Math.max(1, size.height);
+  const scale = Math.min(widthScale, heightScale);
+  const width = Math.max(1, Math.round(size.width * scale));
+  const height = Math.max(1, Math.round(size.height * scale));
+  const type = /^data:image\/png/i.test(dataUrl) ? "png" : "jpg";
+
+  return new Paragraph({
+    children: [
+      new ImageRun({
+        data: bytes,
+        type,
+        transformation: { width, height },
+      } as any),
+    ],
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0 },
+  });
+}
+
 function createTextParagraph(text: string, options: any = {}) {
     const lines = text.split('\n');
     return lines.map((line, idx) => {
@@ -51,33 +120,15 @@ function createTextParagraph(text: string, options: any = {}) {
 }
 
 export async function generateDocxCV(options: PDFExportOptions, download = true): Promise<Blob> {
-  const { expert, position_title, certification } = options;
+  const { branding, expert, position_title, certification } = options;
   const resolvedTitle = position_title && !position_title.startsWith("pos_") ? position_title : (expert.primary_position || "Resident Inspector");
 
   const header = new Header({
-    children: [
-      new Paragraph({
-        children: [
-          new TextRun({ text: "MINISTRY OF AGRICULTURAL, FISHERIES WEALTH AND WATER RESOURCES", bold: true, size: 20 }),
-          new TextRun({ text: "\nConsultancy Services for Design Review & Construction Supervision of Wadi Bani Umar Flood Protection", italics: true, size: 18 }),
-          new TextRun({ text: "\nDam (A) in Wilayat Liwa, North Al Batinah Governorate, Sultanate of Oman", italics: true, size: 18 }),
-        ],
-        border: { bottom: { color: "0055AA", space: 10, style: BorderStyle.THICK, size: 12 } },
-        spacing: { after: 300 },
-      }),
-    ],
+    children: [brandingImageParagraph(branding?.header_base64, 600, 84)],
   });
 
   const footer = new Footer({
-    children: [
-      new Paragraph({
-        children: [
-          new TextRun({ text: "VIA", bold: true, color: "0055AA", size: 24 }),
-          new TextRun({ text: " INTERNATIONAL\t\t", color: "0055AA", size: 12 }),
-          new TextRun({ text: "Technical Proposal", italics: true, color: "888888", size: 20 }),
-        ],
-      }),
-    ],
+    children: [brandingImageParagraph(branding?.footer_base64, 600, 60)],
   });
 
   let children: any[] = [];

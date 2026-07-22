@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X, RefreshCw, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
+import { resolveOutputBranding } from '../lib/outputBranding';
 
 interface RegenerateCVModalProps {
   cv: any;
@@ -31,16 +32,23 @@ export function RegenerateCVModal({ cv, onClose, onRegenerate }: RegenerateCVMod
         
         setBrandings(allBrandings);
         
-        const currentHeader = cv.customBranding?.header_base64 || tender?.branding?.header_base64 || '';
-        const currentFooter = cv.customBranding?.footer_base64 || tender?.branding?.footer_base64 || '';
+        const currentBranding = resolveOutputBranding(cv.customBranding, tender?.branding);
+        const currentHeader = currentBranding?.header_base64 || '';
+        const currentFooter = currentBranding?.footer_base64 || '';
         
         setBranding({
+          profile_id: currentBranding?.profile_id,
+          profile_name: currentBranding?.profile_name,
           header_base64: currentHeader,
           footer_base64: currentFooter
         });
         
         if (currentHeader || currentFooter) {
-          const match = allBrandings.find((b: any) => b.header_base64 === currentHeader && b.footer_base64 === currentFooter);
+          const currentProfileId = currentBranding?.profile_id;
+          const match = allBrandings.find((b: any) =>
+            b.id === currentProfileId ||
+            (b.header_base64 === currentHeader && b.footer_base64 === currentFooter),
+          );
           if (match) {
             setSelectedBrandingId(match.id);
           }
@@ -58,7 +66,12 @@ export function RegenerateCVModal({ cv, onClose, onRegenerate }: RegenerateCVMod
     setSelectedBrandingId(id);
     const match = brandings.find(b => b.id === id);
     if (match) {
-      setBranding({ header_base64: match.header_base64, footer_base64: match.footer_base64 });
+      setBranding({
+        profile_id: match.id,
+        profile_name: match.name,
+        header_base64: match.header_base64,
+        footer_base64: match.footer_base64,
+      });
     } else {
       setBranding({ header_base64: "", footer_base64: "" });
     }

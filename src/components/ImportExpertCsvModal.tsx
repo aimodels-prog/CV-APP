@@ -292,7 +292,7 @@ export function ImportExpertCsvModal({
               </div>
               <div>
                 <h2 className="text-xl font-bold text-slate-800">
-                  Import Expert CSV or JSON Data
+                  Import Notebook Expert Text
                 </h2>
                 <p className="text-sm text-slate-500">
                   Paste the expert CSV or JSON text below to auto-populate the database. JSON supports nested experiences.

@@ -1268,6 +1268,14 @@ export function createPostgresApiRouter(pool: Pool) {
     requireAdminAccess,
     asyncRoute(async (req, res) => {
       const updates = requireObject(req.body);
+      const existingResult = await pool.query(
+        `SELECT * FROM brandings WHERE id = $1`,
+        [req.params.id],
+      );
+      if (!existingResult.rowCount) {
+        throw new HttpError(404, "NOT_FOUND", "Branding not found.");
+      }
+      const existingBranding = brandingFromRow(existingResult.rows[0]);
       const result = await pool.query(
         `
           UPDATE brandings SET
@@ -1284,7 +1292,58 @@ export function createPostgresApiRouter(pool: Pool) {
       if (!result.rowCount) {
         throw new HttpError(404, "NOT_FOUND", "Branding not found.");
       }
-      res.json(brandingFromRow(result.rows[0]));
+      const updatedBranding = brandingFromRow(result.rows[0]);
+      const linkedBranding = {
+        profile_id: req.params.id,
+        profile_name: updatedBranding.name || "",
+        header_base64: updatedBranding.header_base64 || "",
+        footer_base64: updatedBranding.footer_base64 || "",
+      };
+      const canMatchLegacyBranding = Boolean(
+        existingBranding.header_base64 || existingBranding.footer_base64,
+      );
+      const propagationParameters = [
+        req.params.id,
+        JSON.stringify(linkedBranding),
+        existingBranding.header_base64 || "",
+        existingBranding.footer_base64 || "",
+        canMatchLegacyBranding,
+      ];
+
+      await pool.query(
+        `
+          UPDATE tenders
+          SET data = JSONB_SET(data, '{branding}', $2::JSONB, TRUE)
+          WHERE data->'branding'->>'profile_id' = $1
+             OR (
+               $5::BOOLEAN
+               AND COALESCE(data->'branding'->>'profile_id', '') = ''
+               AND COALESCE(data->'branding'->>'header_base64', '') = $3
+               AND COALESCE(data->'branding'->>'footer_base64', '') = $4
+             )
+        `,
+        propagationParameters,
+      );
+      await pool.query(
+        `
+          UPDATE generated_cvs
+          SET data = JSONB_SET(data, '{customBranding}', $2::JSONB, TRUE)
+          WHERE data->'customBranding'->>'profile_id' = $1
+             OR (
+               $5::BOOLEAN
+               AND COALESCE(data->'customBranding'->>'profile_id', '') = ''
+               AND COALESCE(data->'customBranding'->>'header_base64', '') = $3
+               AND COALESCE(data->'customBranding'->>'footer_base64', '') = $4
+             )
+        `,
+        propagationParameters,
+      );
+      await addActivityLog(
+        pool,
+        "UPDATE_BRANDING",
+        `Updated branding ${updatedBranding.name || req.params.id}`,
+      );
+      res.json(updatedBranding);
     }),
   );
 

@@ -45,7 +45,10 @@ export function ConfirmTenderModal({ tender, onSave, onCancel }: ConfirmTenderMo
       const currentHeader = tender.branding?.header_base64;
       const currentFooter = tender.branding?.footer_base64;
       if (currentHeader || currentFooter) {
-        const match = data.find((b: any) => b.header_base64 === currentHeader && b.footer_base64 === currentFooter);
+        const match = data.find((b: any) =>
+          b.id === tender.branding?.profile_id ||
+          (b.header_base64 === currentHeader && b.footer_base64 === currentFooter),
+        );
         if (match) {
           setSelectedBrandingId(match.id);
         }
@@ -60,7 +63,12 @@ export function ConfirmTenderModal({ tender, onSave, onCancel }: ConfirmTenderMo
     if (match) {
       setEditedTender(prev => ({
         ...prev,
-        branding: { header_base64: match.header_base64, footer_base64: match.footer_base64 }
+        branding: {
+          profile_id: match.id,
+          profile_name: match.name,
+          header_base64: match.header_base64,
+          footer_base64: match.footer_base64,
+        }
       }));
     } else {
       setEditedTender(prev => ({
