@@ -437,6 +437,7 @@ ${cleanText(h.project)}`;
 
   autoTable(doc, {
     startY: y,
+    tableWidth: contentWidth,
     head: [[ "Period", "Employing\nOrganization", "Country", "Summary of activities performed relevant to\nthe Assignment" ]],
     body: tableData,
     theme: "grid",
@@ -446,7 +447,7 @@ ${cleanText(h.project)}`;
       0: { cellWidth: 20, halign: "center", valign: "top" },
       1: { cellWidth: 50, halign: "center", valign: "top" },
       2: { cellWidth: 25, halign: "center", valign: "top" },
-      3: { cellWidth: "auto", halign: "left", valign: "top" },
+      3: { cellWidth: 85, halign: "left", valign: "top" },
     },
     rowPageBreak: "auto",
     margin: { left: startX, right: startX, top: 40, bottom: 30 },
@@ -846,6 +847,7 @@ function generateSpecialized(doc: any, options: PDFExportOptions) {
 
   autoTable(doc, {
     startY: y,
+    tableWidth: contentWidth,
     head: [
       ["Period", "Employing organization", "Country", "Summary of activities"],
     ],
@@ -856,7 +858,7 @@ function generateSpecialized(doc: any, options: PDFExportOptions) {
       0: { cellWidth: 25 },
       1: { cellWidth: 50 },
       2: { cellWidth: 25 },
-      3: { cellWidth: "auto" },
+      3: { cellWidth: 80 },
     },
     rowPageBreak: "avoid",
     margin: { left: startX, right: startX, top: 50, bottom: 40 },
