@@ -44,6 +44,27 @@ export function BrandingModal({ tender, onClose, onSave }: BrandingModalProps) {
     }
   };
 
+  const handleBrandingImage = (
+    field: 'header_base64' | 'footer_base64',
+    file?: File,
+  ) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setBranding((current: any) => ({
+        ...current,
+        [field]: reader.result as string,
+      }));
+      setSelectedBrandingId('');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeBrandingImage = (field: 'header_base64' | 'footer_base64') => {
+    setBranding((current: any) => ({ ...current, [field]: '' }));
+    setSelectedBrandingId('');
+  };
+
 
   
   const handleSave = async () => {
@@ -98,26 +119,70 @@ export function BrandingModal({ tender, onClose, onSave }: BrandingModalProps) {
               <p className="text-xs text-slate-500 mt-1">You can create new branding profiles in Settings.</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block">Header Preview</label>
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block">Header</label>
                 <div className="relative aspect-[4/1] bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center overflow-hidden">
                   {branding.header_base64 ? (
-                    <img src={branding.header_base64} className="w-full h-full object-contain p-2" />
+                    <img src={branding.header_base64} className="w-full h-full object-contain p-2" alt="Tender header preview" />
                   ) : (
                     <span className="text-xs text-slate-400">No header selected</span>
                   )}
                 </div>
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100">
+                    <ImageIcon size={14} />
+                    {branding.header_base64 ? 'Replace' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="hidden"
+                      onChange={(event) => handleBrandingImage('header_base64', event.target.files?.[0])}
+                    />
+                  </label>
+                  {branding.header_base64 && (
+                    <button
+                      type="button"
+                      onClick={() => removeBrandingImage('header_base64')}
+                      className="px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">Recommended: 1800 × 250 px</p>
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block">Footer Preview</label>
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block">Footer</label>
                 <div className="relative aspect-[4/1] bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center overflow-hidden">
                   {branding.footer_base64 ? (
-                    <img src={branding.footer_base64} className="w-full h-full object-contain p-2" />
+                    <img src={branding.footer_base64} className="w-full h-full object-contain p-2" alt="Tender footer preview" />
                   ) : (
                     <span className="text-xs text-slate-400">No footer selected</span>
                   )}
                 </div>
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100">
+                    <ImageIcon size={14} />
+                    {branding.footer_base64 ? 'Replace' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="hidden"
+                      onChange={(event) => handleBrandingImage('footer_base64', event.target.files?.[0])}
+                    />
+                  </label>
+                  {branding.footer_base64 && (
+                    <button
+                      type="button"
+                      onClick={() => removeBrandingImage('footer_base64')}
+                      className="px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">Recommended: 1800 × 180 px</p>
               </div>
             </div>
           </section>
