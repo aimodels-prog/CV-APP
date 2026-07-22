@@ -178,7 +178,7 @@ export const postgresApi = {
       body: JSON.stringify(updates),
     }),
   updateTenderBranding: async (id: string, branding: any) => {
-    await request(`/tenders/${encodeURIComponent(id)}`, {
+    await request(`/tenders/${encodeURIComponent(id)}/branding`, {
       method: "PATCH",
       body: JSON.stringify({ branding }),
     });

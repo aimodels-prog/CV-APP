@@ -21,6 +21,10 @@ import NotificationPanel from "./components/NotificationPanel";
 import { GlobalModals } from "./components/GlobalModals";
 import { useState, useEffect } from "react";
 import { ReferenceDataProvider } from "./lib/ReferenceDataContext";
+import NotificationHost from "./components/NotificationHost";
+import { installBrowserNotificationBridge } from "./lib/notifications";
+
+installBrowserNotificationBridge();
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -70,6 +74,7 @@ export default function App() {
 
             <TasksOverlay />
             <GlobalModals />
+            <NotificationHost />
           </div>
         </div>
       </Router>

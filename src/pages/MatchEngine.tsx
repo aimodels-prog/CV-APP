@@ -45,6 +45,7 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { RegenerateCVModal } from "../components/RegenerateCVModal";
+import { appConfirm } from "../lib/notifications";
 import { motion, AnimatePresence } from "motion/react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
@@ -757,9 +758,10 @@ export default function MatchEngine() {
     if (targets.length === 0) return;
 
     if (
-      !window.confirm(
+      !(await appConfirm(
         `You are about to adapt ${targets.length} CVs using the AI engine. This might take several minutes depending on the number of candidates. Do you want to proceed?`,
-      )
+        { title: 'Adapt selected CVs', confirmLabel: 'Adapt CVs' },
+      ))
     )
       return;
 
@@ -852,9 +854,10 @@ export default function MatchEngine() {
     if (targets.length === 0) return;
 
     if (
-      !window.confirm(
+      !(await appConfirm(
         `You are about to render and intelligently fill ${targets.length} CVs using the AI engine. This might take several minutes depending on the number of candidates. Do you want to proceed?`,
-      )
+        { title: 'Render selected CVs', confirmLabel: 'Render CVs' },
+      ))
     )
       return;
 

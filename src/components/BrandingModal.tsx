@@ -52,9 +52,9 @@ export function BrandingModal({ tender, onClose, onSave }: BrandingModalProps) {
       await api.updateTenderBranding(tender.id, branding);
       onSave();
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to save branding settings.");
+      alert(`Failed to save branding settings: ${err?.message || "Unknown error"}`);
     } finally {
       setIsSaving(false);
     }

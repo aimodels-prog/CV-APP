@@ -255,6 +255,26 @@ async function runApiIntegrationTest() {
     );
     assert(documents.length === 2, "Multiple tender documents were not stored.");
 
+    const brandedTender = await request(
+      "/tenders/integration-tender-1/branding",
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          branding: {
+            header_base64: "data:image/png;base64,integration-header",
+            footer_base64: "data:image/png;base64,integration-footer",
+          },
+        }),
+      },
+    );
+    assert(
+      brandedTender.branding?.header_base64 ===
+        "data:image/png;base64,integration-header" &&
+        brandedTender.branding?.footer_base64 ===
+          "data:image/png;base64,integration-footer",
+      "Tender branding did not persist independently.",
+    );
+
     await request("/matches/bulk", {
       method: "POST",
       body: JSON.stringify({
@@ -391,6 +411,7 @@ async function runApiIntegrationTest() {
         "experts",
         "tenders",
         "multiple tender documents",
+        "tender branding persistence",
         "matches",
         "generated CVs",
         "brandings",

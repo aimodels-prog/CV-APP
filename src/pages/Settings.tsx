@@ -17,6 +17,7 @@ import { api } from '../lib/api';
 import { useReferenceData } from '../lib/ReferenceDataContext';
 import UsersComponent from './Users';
 import { useSearchParams } from 'react-router-dom';
+import { appConfirm } from '../lib/notifications';
 
 export default function Settings() {
   const { values } = useReferenceData();
@@ -44,7 +45,11 @@ export default function Settings() {
   };
 
   const handleDeleteBranding = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this branding?")) {
+    if (await appConfirm("Are you sure you want to delete this branding?", {
+      title: 'Delete branding profile',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })) {
       await api.deleteBranding(id);
       loadBrandings();
     }

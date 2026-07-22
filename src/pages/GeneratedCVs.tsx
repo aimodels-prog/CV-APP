@@ -25,6 +25,7 @@ import { api } from "../lib/api";
 import { useReferenceData } from "../lib/ReferenceDataContext";
 import { generateReformatedCV } from "../lib/pdf";
 import { RegenerateCVModal } from "../components/RegenerateCVModal";
+import { appConfirm } from "../lib/notifications";
 import { motion, AnimatePresence } from "motion/react";
 import clsx from "clsx";
 import { Document, Page, pdfjs } from "react-pdf";
@@ -637,9 +638,10 @@ export default function GeneratedCVs() {
     if (targets.length === 0) return;
 
     if (
-      !window.confirm(
+      !(await appConfirm(
         `You are about to adapt ${targets.length} CVs using the AI engine. This might take several minutes depending on the number of candidates. Do you want to proceed?`,
-      )
+        { title: 'Adapt selected CVs', confirmLabel: 'Adapt CVs' },
+      ))
     )
       return;
 
@@ -711,9 +713,10 @@ export default function GeneratedCVs() {
     if (targets.length === 0) return;
 
     if (
-      !window.confirm(
+      !(await appConfirm(
         `You are about to render and intelligently fill ${targets.length} CVs using the AI engine. This might take several minutes depending on the number of candidates. Do you want to proceed?`,
-      )
+        { title: 'Render selected CVs', confirmLabel: 'Render CVs' },
+      ))
     )
       return;
 

@@ -820,6 +820,33 @@ export function createPostgresApiRouter(pool: Pool) {
   );
 
   router.patch(
+    "/tenders/:id/branding",
+    requireWriteAccess,
+    asyncRoute(async (req, res) => {
+      const body = requireObject(req.body);
+      const branding = requireObject(body.branding);
+      const result = await pool.query(
+        `
+          UPDATE tenders
+          SET data = JSONB_SET(data, '{branding}', $2::JSONB, TRUE)
+          WHERE id = $1
+          RETURNING *
+        `,
+        [req.params.id, JSON.stringify(branding)],
+      );
+      if (!result.rowCount) {
+        throw new HttpError(404, "NOT_FOUND", "Tender not found.");
+      }
+      await addActivityLog(
+        pool,
+        "Tender Branding Updated",
+        `Updated branding for tender ${req.params.id}`,
+      );
+      res.json(tenderFromRow(result.rows[0]));
+    }),
+  );
+
+  router.patch(
     "/tenders/:id",
     requireWriteAccess,
     asyncRoute(async (req, res) => {

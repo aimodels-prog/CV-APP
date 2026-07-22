@@ -54,6 +54,7 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { appConfirm } from '../lib/notifications';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -357,9 +358,13 @@ export default function MatchResults() {
     if (targets.length === 0) return;
 
     if (
-      !confirm(
+      !(await appConfirm(
         `Are you sure you want to generate ${targets.length} Normal CVs in template ${selectedTemplate}?`,
-      )
+        {
+          title: "Generate normal CVs",
+          confirmLabel: "Generate CVs",
+        },
+      ))
     )
       return;
 
@@ -441,7 +446,13 @@ export default function MatchResults() {
     const targets = getBulkTargets();
     if (targets.length === 0) return;
 
-    if (!confirm(`Are you sure you want to Adapt ${targets.length} CVs?`)) return;
+    if (
+      !(await appConfirm(`Are you sure you want to Adapt ${targets.length} CVs?`, {
+        title: "Adapt selected CVs",
+        confirmLabel: "Adapt CVs",
+      }))
+    )
+      return;
 
     const taskId = addTask({
       type: "GENERATE",
@@ -527,7 +538,13 @@ export default function MatchResults() {
     const targets = getBulkTargets();
     if (targets.length === 0) return;
 
-    if (!confirm(`Are you sure you want to AI Render ${targets.length} CVs?`)) return;
+    if (
+      !(await appConfirm(`Are you sure you want to AI Render ${targets.length} CVs?`, {
+        title: "Render selected CVs",
+        confirmLabel: "Render CVs",
+      }))
+    )
+      return;
 
     const taskId = addTask({
       type: "GENERATE",
@@ -630,7 +647,16 @@ export default function MatchResults() {
     const targets = requireSelectedVersionCvs();
     if (targets.length === 0) return;
     const actionName = regenerate ? 'Regenerate' : format === 'word' ? 'Word export' : 'PDF export';
-    if (!confirm(`${actionName} ${targets.length} ${bulkCvMode.toLowerCase()} CV(s)?`)) return;
+    if (
+      !(await appConfirm(
+        `${actionName} ${targets.length} ${bulkCvMode.toLowerCase()} CV(s)?`,
+        {
+          title: `${actionName} selected CVs`,
+          confirmLabel: actionName,
+        },
+      ))
+    )
+      return;
 
     setIsBulkActionRunning(true);
     const taskId = addTask({
@@ -697,7 +723,16 @@ export default function MatchResults() {
       alert('Select a target language first.');
       return;
     }
-    if (!confirm(`Translate ${targets.length} ${bulkCvMode.toLowerCase()} CV(s) to ${bulkLanguage}?`)) return;
+    if (
+      !(await appConfirm(
+        `Translate ${targets.length} ${bulkCvMode.toLowerCase()} CV(s) to ${bulkLanguage}?`,
+        {
+          title: "Translate selected CVs",
+          confirmLabel: "Translate CVs",
+        },
+      ))
+    )
+      return;
 
     setIsBulkActionRunning(true);
     const taskId = addTask({
