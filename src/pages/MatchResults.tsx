@@ -278,6 +278,12 @@ export default function MatchResults() {
       .map((match) => cvForMode(match, bulkCvMode))
       .filter(Boolean) as any[];
 
+  const bulkSelectedMatchCount = selectedMatches().length;
+  const bulkReadyVersionCount = selectedVersionCvs().length;
+  const bulkVersionReady =
+    bulkSelectedMatchCount > 0 &&
+    bulkReadyVersionCount === bulkSelectedMatchCount;
+
   const tenderForCv = async (cv: any) =>
     tenders.find((tender) => tender.id === cv.tenderId) || api.getTender(cv.tenderId);
 
@@ -667,7 +673,10 @@ export default function MatchResults() {
       return [];
     }
     if (versions.length < selected.length) {
-      alert(`${selected.length - versions.length} selected match(es) have no ${bulkCvMode.toLowerCase()} CV and will be skipped.`);
+      alert(
+        `${selected.length - versions.length} selected match(es) have no ${bulkCvMode.toLowerCase()} CV yet. Generate that CV version before using its output actions.`,
+      );
+      return [];
     }
     return versions;
   };
@@ -1444,31 +1453,47 @@ export default function MatchResults() {
                   <option value="RENDER">Rendered CV</option>
                 </select>
               </label>
+              <span
+                className={clsx(
+                  "rounded-full border px-2.5 py-1 text-[11px] font-bold",
+                  bulkVersionReady
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700",
+                )}
+              >
+                {bulkVersionReady
+                  ? "Ready"
+                  : `${bulkReadyVersionCount}/${bulkSelectedMatchCount} ready`}
+              </span>
               <button
                 onClick={() => void handleBulkPreview()}
-                disabled={isBulkGenerating}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                disabled={isBulkGenerating || !bulkVersionReady}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-60"
+                title={bulkVersionReady ? "View selected CV version" : `Generate the ${bulkCvMode.toLowerCase()} CV version first`}
               >
                 <Eye size={14} /> View
               </button>
               <button
                 onClick={() => void handleBulkPackage('pdf', true)}
-                disabled={isBulkGenerating}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                disabled={isBulkGenerating || !bulkVersionReady}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-60"
+                title={bulkVersionReady ? "Regenerate selected CV version" : `Generate the ${bulkCvMode.toLowerCase()} CV version first`}
               >
                 <RefreshCw size={14} /> Regenerate
               </button>
               <button
                 onClick={() => void handleBulkPackage('word')}
-                disabled={isBulkGenerating}
-                className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                disabled={isBulkGenerating || !bulkVersionReady}
+                className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-60"
+                title={bulkVersionReady ? "Download selected CV version as Word" : `Generate the ${bulkCvMode.toLowerCase()} CV version first`}
               >
                 <FileIcon size={14} /> Word ZIP
               </button>
               <button
                 onClick={() => void handleBulkPackage('pdf')}
-                disabled={isBulkGenerating}
-                className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                disabled={isBulkGenerating || !bulkVersionReady}
+                className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-60"
+                title={bulkVersionReady ? "Download selected CV version as PDF" : `Generate the ${bulkCvMode.toLowerCase()} CV version first`}
               >
                 <Download size={14} /> PDF ZIP
               </button>
@@ -1478,8 +1503,8 @@ export default function MatchResults() {
               <select
                 value={bulkLanguage}
                 onChange={(event) => setBulkLanguage(event.target.value)}
-                disabled={isBulkGenerating}
-                className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 outline-none focus:border-blue-500 disabled:opacity-50"
+                disabled={isBulkGenerating || !bulkVersionReady}
+                className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-60"
               >
                 <option value="">Translation language</option>
                 {translationLanguages
@@ -1488,8 +1513,9 @@ export default function MatchResults() {
               </select>
               <button
                 onClick={() => void handleBulkTranslate()}
-                disabled={isBulkGenerating || !bulkLanguage}
-                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                disabled={isBulkGenerating || !bulkVersionReady || !bulkLanguage}
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:opacity-60"
+                title={bulkVersionReady ? "Translate selected CV version" : `Generate the ${bulkCvMode.toLowerCase()} CV version first`}
               >
                 {isBulkActionRunning ? <Loader2 size={14} className="animate-spin" /> : <Languages size={14} />}
                 Translate
@@ -2058,9 +2084,19 @@ export default function MatchResults() {
                                                                   Translate
                                                                 </button>
                                                               </div>
-                                                             <h5 className="text-[11px] font-bold uppercase tracking-wider text-indigo-500 mb-1">
-                                                               Adapt CV
-                                                             </h5>
+                                                             <div className="mb-1 flex items-center justify-between gap-2">
+                                                               <h5 className="text-[11px] font-bold uppercase tracking-wider text-indigo-500">
+                                                                 Adapt CV
+                                                               </h5>
+                                                               <span className={clsx(
+                                                                 "rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+                                                                 adaptedCv
+                                                                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                                   : "border-slate-200 bg-slate-50 text-slate-500",
+                                                               )}>
+                                                                 {adaptedCv ? "Ready" : "Create first"}
+                                                               </span>
+                                                             </div>
                                                              <button
                                                                onClick={(e) => { e.stopPropagation(); handleAdaptCV(adaptActionCv); }}
                                                                disabled={adaptingId === adaptActionCv.id || renderingId === adaptActionCv.id}
@@ -2126,9 +2162,19 @@ export default function MatchResults() {
 
                                                              <div className="h-px bg-slate-100 my-1"></div>
 
-                                                             <h5 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 mb-1">
-                                                               Render CV
-                                                             </h5>
+                                                             <div className="mb-1 flex items-center justify-between gap-2">
+                                                               <h5 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+                                                                 Render CV
+                                                               </h5>
+                                                               <span className={clsx(
+                                                                 "rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+                                                                 renderedCv
+                                                                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                                   : "border-slate-200 bg-slate-50 text-slate-500",
+                                                               )}>
+                                                                 {renderedCv ? "Ready" : "Create first"}
+                                                               </span>
+                                                             </div>
                                                              <button
                                                                onClick={(e) => { e.stopPropagation(); handleRenderCV(renderActionCv); }}
                                                                disabled={renderingId === renderActionCv.id || adaptingId === renderActionCv.id}
