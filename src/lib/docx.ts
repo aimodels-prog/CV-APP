@@ -15,6 +15,11 @@ import {
 } from "docx";
 import { saveAs } from "file-saver";
 import { formatCertificationDate, PDFExportOptions } from "./pdf";
+import {
+  DOCUMENT_BRANDING_HEIGHT_MM,
+  DOCUMENT_CONTENT_WIDTH_MM,
+  DOCUMENT_SIDE_MARGIN_MM,
+} from "./outputBranding";
 
 export function cleanText(text: any, preserveNewlines = false): string {
   if (text === null || text === undefined) return "";
@@ -50,49 +55,14 @@ function dataUriBytes(dataUrl: string): Uint8Array | null {
   return bytes;
 }
 
-function imagePixelSize(dataUrl: string, bytes: Uint8Array) {
-  if (/^data:image\/png/i.test(dataUrl) && bytes.length >= 24) {
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    return { width: view.getUint32(16), height: view.getUint32(20) };
-  }
-
-  if (/^data:image\/jpe?g/i.test(dataUrl)) {
-    let offset = 2;
-    while (offset + 8 < bytes.length) {
-      if (bytes[offset] !== 0xff) {
-        offset += 1;
-        continue;
-      }
-      const marker = bytes[offset + 1];
-      const length = (bytes[offset + 2] << 8) + bytes[offset + 3];
-      if (length < 2) break;
-      if (marker >= 0xc0 && marker <= 0xc3) {
-        return {
-          height: (bytes[offset + 5] << 8) + bytes[offset + 6],
-          width: (bytes[offset + 7] << 8) + bytes[offset + 8],
-        };
-      }
-      offset += length + 2;
-    }
-  }
-
-  return { width: 1, height: 1 };
-}
-
 function brandingImageParagraph(
   dataUrl: string | undefined,
   targetWidth: number,
-  _maxHeight: number,
+  targetHeight: number,
 ) {
   if (!dataUrl) return new Paragraph({ children: [] });
   const bytes = dataUriBytes(dataUrl);
   if (!bytes) return new Paragraph({ children: [] });
-  const size = imagePixelSize(dataUrl, bytes);
-  // Lock branding to the full Word content width. Its height must not reduce
-  // the horizontal span of the header or footer.
-  const scale = targetWidth / Math.max(1, size.width);
-  const width = Math.max(1, Math.round(size.width * scale));
-  const height = Math.max(1, Math.round(size.height * scale));
   const type = /^data:image\/png/i.test(dataUrl) ? "png" : "jpg";
 
   return new Paragraph({
@@ -100,7 +70,7 @@ function brandingImageParagraph(
       new ImageRun({
         data: bytes,
         type,
-        transformation: { width, height },
+        transformation: { width: targetWidth, height: targetHeight },
       } as any),
     ],
     alignment: AlignmentType.CENTER,
@@ -122,13 +92,17 @@ function createTextParagraph(text: string, options: any = {}) {
 export async function generateDocxCV(options: PDFExportOptions, download = true): Promise<Blob> {
   const { branding, expert, position_title, certification } = options;
   const resolvedTitle = position_title && !position_title.startsWith("pos_") ? position_title : (expert.primary_position || "Resident Inspector");
+  const millimetresToPixels = (value: number) => Math.round(value * 96 / 25.4);
+  const millimetresToTwips = (value: number) => Math.round(value * 1440 / 25.4);
+  const brandingWidth = millimetresToPixels(DOCUMENT_CONTENT_WIDTH_MM);
+  const brandingHeight = millimetresToPixels(DOCUMENT_BRANDING_HEIGHT_MM);
 
   const header = new Header({
-    children: [brandingImageParagraph(branding?.header_base64, 600, 84)],
+    children: [brandingImageParagraph(branding?.header_base64, brandingWidth, brandingHeight)],
   });
 
   const footer = new Footer({
-    children: [brandingImageParagraph(branding?.footer_base64, 600, 60)],
+    children: [brandingImageParagraph(branding?.footer_base64, brandingWidth, brandingHeight)],
   });
 
   let children: any[] = [];
@@ -505,7 +479,16 @@ export async function generateDocxCV(options: PDFExportOptions, download = true)
     },
     sections: [
       {
-        properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
+        properties: {
+          page: {
+            margin: {
+              top: 1440,
+              right: millimetresToTwips(DOCUMENT_SIDE_MARGIN_MM),
+              bottom: 1440,
+              left: millimetresToTwips(DOCUMENT_SIDE_MARGIN_MM),
+            },
+          },
+        },
         headers: { default: header },
         footers: { default: footer },
         children: children,

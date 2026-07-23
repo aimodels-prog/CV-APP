@@ -1,5 +1,10 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  DOCUMENT_BRANDING_HEIGHT_MM,
+  DOCUMENT_CONTENT_WIDTH_MM,
+  DOCUMENT_SIDE_MARGIN_MM,
+} from "./outputBranding";
 
 // Re-declaring for TypeScript support in this file
 declare module "jspdf" {
@@ -47,16 +52,7 @@ function addBrandingImage(
   const format = getPdfImageFormat(dataUrl);
   if (!format) return;
 
-  const properties = doc.getImageProperties(dataUrl);
-  // Lock branding to the full document width. A slightly taller source image
-  // must not make the visible header/footer narrower than the tables.
-  const scale = maxWidth / properties.width;
-  const width = properties.width * scale;
-  const height = properties.height * scale;
-  const centeredX = x + (maxWidth - width) / 2;
-  const centeredY = y + (maxHeight - height) / 2;
-
-  doc.addImage(dataUrl, format, centeredX, centeredY, width, height);
+  doc.addImage(dataUrl, format, x, y, maxWidth, maxHeight);
 }
 
 export function formatCertificationDate(value?: string): string {
@@ -317,19 +313,33 @@ function generateDoc(doc: any, options: PDFExportOptions) {
   const { branding, expert, position_title } = options;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const startX = 15;
-  const contentWidth = pageWidth - startX * 2;
+  const startX = DOCUMENT_SIDE_MARGIN_MM;
+  const contentWidth = DOCUMENT_CONTENT_WIDTH_MM;
 
   const drawHeader = (doc: any, pageNum: number) => {
     if (branding?.header_base64) {
-      addBrandingImage(doc, branding.header_base64, startX, 10, contentWidth, 25);
+      addBrandingImage(
+        doc,
+        branding.header_base64,
+        startX,
+        10,
+        DOCUMENT_CONTENT_WIDTH_MM,
+        DOCUMENT_BRANDING_HEIGHT_MM,
+      );
     }
   };
 
   const drawFooter = (doc: any, pageNum: number, totalPages: number) => {
     doc.setPage(pageNum);
     if (branding?.footer_base64) {
-      addBrandingImage(doc, branding.footer_base64, startX, pageHeight - 20, contentWidth, 18);
+      addBrandingImage(
+        doc,
+        branding.footer_base64,
+        startX,
+        pageHeight - 20,
+        DOCUMENT_CONTENT_WIDTH_MM,
+        DOCUMENT_BRANDING_HEIGHT_MM,
+      );
     }
   };
 
@@ -632,8 +642,8 @@ function generateSpecialized(doc: any, options: PDFExportOptions) {
   const pageHeight = doc.internal.pageSize.getHeight();
   // Keep legacy documents on the same horizontal grid as General documents
   // and the uploaded 1800 px branding artwork (180 mm printable width).
-  const startX = 15;
-  const contentWidth = pageWidth - startX * 2;
+  const startX = DOCUMENT_SIDE_MARGIN_MM;
+  const contentWidth = DOCUMENT_CONTENT_WIDTH_MM;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
@@ -989,7 +999,14 @@ function generateSpecialized(doc: any, options: PDFExportOptions) {
 
     // Header
     if (branding?.header_base64) {
-      addBrandingImage(doc, branding.header_base64, startX, 10, contentWidth, 25);
+      addBrandingImage(
+        doc,
+        branding.header_base64,
+        startX,
+        10,
+        DOCUMENT_CONTENT_WIDTH_MM,
+        DOCUMENT_BRANDING_HEIGHT_MM,
+      );
     }
 
     // Footer
@@ -1002,8 +1019,8 @@ function generateSpecialized(doc: any, options: PDFExportOptions) {
         branding.footer_base64,
         startX,
         pageHeight - 20,
-        contentWidth,
-        18,
+        DOCUMENT_CONTENT_WIDTH_MM,
+        DOCUMENT_BRANDING_HEIGHT_MM,
       );
     }
 

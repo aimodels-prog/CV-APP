@@ -4,6 +4,10 @@ export interface OutputBranding {
   [key: string]: unknown;
 }
 
+export const DOCUMENT_SIDE_MARGIN_MM = 15;
+export const DOCUMENT_CONTENT_WIDTH_MM = 180;
+export const DOCUMENT_BRANDING_HEIGHT_MM = 18;
+
 const hasBrandingImage = (branding?: OutputBranding | null) =>
   Boolean(
     branding &&

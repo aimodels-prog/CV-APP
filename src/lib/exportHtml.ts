@@ -1,5 +1,10 @@
 import html2pdf from 'html2pdf.js';
-import type { OutputBranding } from './outputBranding';
+import {
+  DOCUMENT_BRANDING_HEIGHT_MM,
+  DOCUMENT_CONTENT_WIDTH_MM,
+  DOCUMENT_SIDE_MARGIN_MM,
+  type OutputBranding,
+} from './outputBranding';
 
 const pdfImageFormat = (dataUrl?: string): 'PNG' | 'JPEG' | null => {
   const match = dataUrl?.match(/^data:image\/(png|jpe?g);base64,/i);
@@ -17,36 +22,37 @@ const addBrandingImage = (
 ) => {
   const format = pdfImageFormat(dataUrl);
   if (!format) return;
-  const properties = pdf.getImageProperties(dataUrl);
-  // Lock branding to the full document width; height only controls placement.
-  const scale = maxWidth / properties.width;
-  const width = properties.width * scale;
-  const height = properties.height * scale;
-  pdf.addImage(
-    dataUrl,
-    format,
-    x + (maxWidth - width) / 2,
-    y + (maxHeight - height) / 2,
-    width,
-    height,
-  );
+  pdf.addImage(dataUrl, format, x, y, maxWidth, maxHeight);
 };
 
 const applyBrandingToPdf = (pdf: any, branding?: OutputBranding) => {
   if (!branding?.header_base64 && !branding?.footer_base64) return;
   const pageCount = pdf.internal.getNumberOfPages();
-  const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const startX = 15;
-  const contentWidth = pageWidth - startX * 2;
+  const startX = DOCUMENT_SIDE_MARGIN_MM;
+  const contentWidth = DOCUMENT_CONTENT_WIDTH_MM;
 
   for (let page = 1; page <= pageCount; page += 1) {
     pdf.setPage(page);
     if (branding.header_base64) {
-      addBrandingImage(pdf, branding.header_base64, startX, 10, contentWidth, 25);
+      addBrandingImage(
+        pdf,
+        branding.header_base64,
+        startX,
+        10,
+        contentWidth,
+        DOCUMENT_BRANDING_HEIGHT_MM,
+      );
     }
     if (branding.footer_base64) {
-      addBrandingImage(pdf, branding.footer_base64, startX, pageHeight - 20, contentWidth, 18);
+      addBrandingImage(
+        pdf,
+        branding.footer_base64,
+        startX,
+        pageHeight - 20,
+        contentWidth,
+        DOCUMENT_BRANDING_HEIGHT_MM,
+      );
     }
   }
 };
@@ -84,7 +90,7 @@ const wordBrandingElement = (
   type: 'header' | 'footer',
   dataUrl?: string,
 ) => dataUrl
-  ? `<div id="via-${type}" style="mso-element:${type}; text-align:center;"><p style="margin:0;"><img src="${dataUrl}" style="width:100%; height:auto;" /></p></div>`
+  ? `<div id="via-${type}" style="mso-element:${type}; text-align:center;"><p style="margin:0;"><img src="${dataUrl}" style="width:100%; height:${DOCUMENT_BRANDING_HEIGHT_MM * 72 / 25.4}pt;" /></p></div>`
   : '';
 
 export function createHtmlDocBlob(
@@ -99,7 +105,7 @@ export function createHtmlDocBlob(
 <style>
   @page ViaCvSection {
     size: 595.3pt 841.9pt;
-    margin: 72pt;
+    margin: 85.04pt 42.52pt 70.87pt 42.52pt;
     mso-header-margin: 20pt;
     mso-footer-margin: 18pt;
     mso-header: via-header;
