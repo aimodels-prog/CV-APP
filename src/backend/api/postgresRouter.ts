@@ -1345,7 +1345,8 @@ export function createPostgresApiRouter(pool: Pool) {
         `
           UPDATE brandings SET
             name = COALESCE($2, name),
-            data = data || $3::JSONB
+            data = data || $3::JSONB,
+            updated_at = NOW()
           WHERE id = $1 RETURNING *
         `,
         [

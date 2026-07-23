@@ -34,7 +34,9 @@ export default function Settings() {
   const [newBranding, setNewBranding] = useState({ name: '', header_base64: '', footer_base64: '' });
   const [editingBrandingId, setEditingBrandingId] = useState<string | null>(null);
   const [isBrandingSaving, setIsBrandingSaving] = useState(false);
+  const [pendingBrandingReads, setPendingBrandingReads] = useState(0);
   const brandingFormRef = useRef<HTMLDivElement | null>(null);
+  const brandingEditVersionRef = useRef(0);
   
   const loadBrandings = async () => {
     const data = await api.getBrandings();
@@ -42,20 +44,33 @@ export default function Settings() {
   };
   
   const resetBrandingForm = () => {
+    brandingEditVersionRef.current += 1;
     setEditingBrandingId(null);
     setNewBranding({ name: '', header_base64: '', footer_base64: '' });
   };
 
   const handleSaveBranding = async () => {
     const branding = { ...newBranding, name: newBranding.name.trim() };
-    if (!branding.name || isBrandingSaving) return;
+    if (!branding.name || isBrandingSaving || pendingBrandingReads > 0) return;
     setIsBrandingSaving(true);
     try {
       if (editingBrandingId) {
-        await api.updateBranding(editingBrandingId, branding);
+        const saved: any = await api.updateBranding(editingBrandingId, branding);
+        if (
+          saved?.header_base64 !== branding.header_base64 ||
+          saved?.footer_base64 !== branding.footer_base64
+        ) {
+          throw new Error('The database did not return the replacement branding images.');
+        }
         alert('Branding profile updated successfully.');
       } else {
-        await api.createBranding(branding);
+        const saved: any = await api.createBranding(branding);
+        if (
+          saved?.header_base64 !== branding.header_base64 ||
+          saved?.footer_base64 !== branding.footer_base64
+        ) {
+          throw new Error('The database did not return the saved branding images.');
+        }
         alert('Branding profile created successfully.');
       }
       resetBrandingForm();
@@ -68,6 +83,7 @@ export default function Settings() {
   };
 
   const handleEditBranding = (branding: any) => {
+    brandingEditVersionRef.current += 1;
     setEditingBrandingId(branding.id);
     setNewBranding({
       name: branding.name || '',
@@ -77,6 +93,51 @@ export default function Settings() {
     window.requestAnimationFrame(() => {
       brandingFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+  };
+
+  const readBrandingImage = (
+    field: 'header_base64' | 'footer_base64',
+    file: File,
+    input: HTMLInputElement,
+  ) => {
+    const editVersion = brandingEditVersionRef.current;
+    const reader = new FileReader();
+    setPendingBrandingReads((count) => count + 1);
+    const finishReading = () => {
+      input.value = '';
+      setPendingBrandingReads((count) => Math.max(0, count - 1));
+    };
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        finishReading();
+        return;
+      }
+      const dataUrl = reader.result;
+      const image = new window.Image();
+      image.onload = () => {
+        if (image.naturalWidth !== 1800 || image.naturalHeight !== 180) {
+          alert(
+            `Branding images must be exactly 1800 × 180 px. Selected image is ${image.naturalWidth} × ${image.naturalHeight} px.`,
+          );
+        } else if (editVersion === brandingEditVersionRef.current) {
+          setNewBranding((current) => ({
+            ...current,
+            [field]: dataUrl,
+          }));
+        }
+        finishReading();
+      };
+      image.onerror = () => {
+        alert('Unable to validate the selected branding image.');
+        finishReading();
+      };
+      image.src = dataUrl;
+    };
+    reader.onerror = () => {
+      alert(`Unable to read the selected ${field === 'header_base64' ? 'header' : 'footer'} image.`);
+      finishReading();
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteBranding = async (id: string) => {
@@ -368,18 +429,16 @@ export default function Settings() {
                            accept="image/png,image/jpeg" 
                           className="hidden" 
                           onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => setNewBranding({...newBranding, header_base64: reader.result as string});
-                              reader.readAsDataURL(file);
+                             const file = e.target.files?.[0];
+                             if (file) {
+                               readBrandingImage('header_base64', file, e.currentTarget);
                             }
                           }}
                         />
                        </label>
-                       <p className="text-xs text-slate-500">Recommended size: 1800 × 250 px</p>
+                       <p className="text-xs text-slate-500">Required size: 1800 × 180 px</p>
                        {newBranding.header_base64 && (
-                        <button onClick={() => setNewBranding({...newBranding, header_base64: ''})} className="text-xs text-red-500 hover:underline mt-1">Remove Header</button>
+                        <button onClick={() => setNewBranding((current) => ({...current, header_base64: ''}))} className="text-xs text-red-500 hover:underline mt-1">Remove Header</button>
                       )}
                     </div>
 
@@ -399,18 +458,16 @@ export default function Settings() {
                            accept="image/png,image/jpeg" 
                           className="hidden" 
                           onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => setNewBranding({...newBranding, footer_base64: reader.result as string});
-                              reader.readAsDataURL(file);
+                             const file = e.target.files?.[0];
+                             if (file) {
+                               readBrandingImage('footer_base64', file, e.currentTarget);
                             }
                           }}
                         />
                        </label>
-                       <p className="text-xs text-slate-500">Recommended size: 1800 × 180 px</p>
+                       <p className="text-xs text-slate-500">Required size: 1800 × 180 px</p>
                        {newBranding.footer_base64 && (
-                        <button onClick={() => setNewBranding({...newBranding, footer_base64: ''})} className="text-xs text-red-500 hover:underline mt-1">Remove Footer</button>
+                        <button onClick={() => setNewBranding((current) => ({...current, footer_base64: ''}))} className="text-xs text-red-500 hover:underline mt-1">Remove Footer</button>
                       )}
                     </div>
                   </div>
@@ -419,7 +476,7 @@ export default function Settings() {
                       <button
                         type="button"
                         onClick={resetBrandingForm}
-                        disabled={isBrandingSaving}
+                        disabled={isBrandingSaving || pendingBrandingReads > 0}
                         className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-50 text-slate-700 rounded-lg text-sm font-medium transition-colors"
                       >
                         Cancel
@@ -427,14 +484,16 @@ export default function Settings() {
                     )}
                     <button 
                       onClick={handleSaveBranding}
-                      disabled={!newBranding.name.trim() || isBrandingSaving}
+                      disabled={!newBranding.name.trim() || isBrandingSaving || pendingBrandingReads > 0}
                       className="px-4 py-2 bg-[#2563eb] hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg text-sm font-medium transition-colors"
                     >
-                      {isBrandingSaving
-                        ? 'Saving...'
-                        : editingBrandingId
-                          ? 'Save Changes'
-                          : 'Save Branding'}
+                      {pendingBrandingReads > 0
+                        ? 'Loading images...'
+                        : isBrandingSaving
+                          ? 'Saving...'
+                          : editingBrandingId
+                            ? 'Save Changes'
+                            : 'Save Branding'}
                     </button>
                   </div>
                 </div>
