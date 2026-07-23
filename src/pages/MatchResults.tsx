@@ -4,6 +4,7 @@ import {
   Search,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   CheckCircle,
   AlertCircle,
   TrendingUp,
@@ -160,24 +161,28 @@ export default function MatchResults() {
   };
 
   const toggleTender = (tenderName: string) => {
-    const newExpanded = new Set(expandedTenders);
-    if (newExpanded.has(tenderName)) {
-      newExpanded.delete(tenderName);
-    } else {
-      newExpanded.add(tenderName);
-    }
-    setExpandedTenders(newExpanded);
+    setExpandedTenders((current) => {
+      const next = new Set(current);
+      if (next.has(tenderName)) {
+        next.delete(tenderName);
+      } else {
+        next.add(tenderName);
+      }
+      return next;
+    });
   };
 
   const togglePosition = (tenderName: string, positionTitle: string) => {
     const key = `${tenderName}-${positionTitle}`;
-    const newExpanded = new Set(expandedPositions);
-    if (newExpanded.has(key)) {
-      newExpanded.delete(key);
-    } else {
-      newExpanded.add(key);
-    }
-    setExpandedPositions(newExpanded);
+    setExpandedPositions((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
   };
 
   const fetchTenders = async () => {
@@ -215,6 +220,23 @@ export default function MatchResults() {
     acc[tenderName][positionTitle].push(match);
     return acc;
   }, {});
+
+  const expandAllMatchGroups = () => {
+    const tenderNames = Object.keys(groupedMatches);
+    const positionKeys = tenderNames.flatMap((tenderName) =>
+      Object.keys(groupedMatches[tenderName]).map(
+        (positionTitle) => `${tenderName}-${positionTitle}`,
+      ),
+    );
+    setExpandedTenders(new Set(tenderNames));
+    setExpandedPositions(new Set(positionKeys));
+  };
+
+  const collapseAllMatchGroups = () => {
+    setExpandedTenders(new Set());
+    setExpandedPositions(new Set());
+    setExpandedMatchId(null);
+  };
 
   const matchesCvIdentity = (cv: any, source: any) => {
     if (cv.matchId && source.id && cv.matchId === source.id) return true;
@@ -1536,32 +1558,72 @@ export default function MatchResults() {
               )}
             </div>
           </div>
+          <div className="flex items-center gap-2 self-end xl:self-auto shrink-0">
+            <span className="hidden 2xl:inline text-xs font-medium text-slate-500 mr-1">
+              {Object.keys(groupedMatches).length} tenders · {filteredMatches.length} candidates
+            </span>
+            <button
+              type="button"
+              onClick={expandAllMatchGroups}
+              disabled={Object.keys(groupedMatches).length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ChevronDown size={15} />
+              Expand All
+            </button>
+            <button
+              type="button"
+              onClick={collapseAllMatchGroups}
+              disabled={expandedTenders.size === 0 && expandedPositions.size === 0 && !expandedMatchId}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ChevronUp size={15} />
+              Collapse All
+            </button>
+          </div>
         </div>
         <div className="divide-y divide-slate-100">
           {Object.entries(groupedMatches).map(
-            ([tenderName, positions]: [string, any], tenderIdx) => {
+            ([tenderName, positions]: [string, any]) => {
               const isTenderExpanded = expandedTenders.has(tenderName);
+              const tenderMatches = Object.values(positions).flat() as any[];
+              const tenderCandidateCount = tenderMatches.length;
 
               return (
                 <div
                   key={tenderName}
-                  className="group/tender border-b border-slate-100 last:border-0"
+                  className={clsx(
+                    "group/tender border-b border-l-4 border-slate-100 last:border-b-0 transition-colors",
+                    isTenderExpanded ? "border-l-blue-500" : "border-l-transparent",
+                  )}
                 >
                   {/* Tender Header */}
                   <div
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isTenderExpanded}
+                    onClick={() => toggleTender(tenderName)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        toggleTender(tenderName);
+                      }
+                    }}
                     className={clsx(
-                      "w-full px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors text-left",
-                      isTenderExpanded ? "bg-blue-50/50" : "hover:bg-slate-50",
+                      "w-full px-4 sm:px-6 py-4 sm:py-5 flex cursor-pointer flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500",
+                      isTenderExpanded ? "bg-blue-50/60" : "hover:bg-slate-50",
                     )}
                   >
                     <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                       <input
                         type="checkbox"
-                        checked={Object.values(positions).flat().length > 0 && (Object.values(positions).flat() as any[]).every((m) => selectedMatchIds.includes(m.id))}
+                        checked={tenderCandidateCount > 0 && tenderMatches.every((m) => selectedMatchIds.includes(m.id))}
+                        onClick={(event) => event.stopPropagation()}
                         onChange={() => toggleTenderSelection(positions)}
                         className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       />
-                      <button onClick={() => toggleTender(tenderName)} className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 text-left">
                         <div
                           className={clsx(
                             "w-10 h-10 rounded-lg flex items-center justify-center transition-colors shrink-0",
@@ -1577,10 +1639,10 @@ export default function MatchResults() {
                             {tenderName}
                           </h3>
                           <p className="text-sm text-slate-500 mt-0.5">
-                            Tender Project
+                            {Object.keys(positions).length} roles · {tenderCandidateCount} candidates
                           </p>
                         </div>
-                      </button>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-4 shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
@@ -1624,11 +1686,6 @@ export default function MatchResults() {
                         }
                         return null;
                       })()}
-                      <div className="text-right sm:block flex-1 sm:flex-none">
-                        <p className="text-sm font-medium text-slate-700 whitespace-nowrap">
-                          {Object.keys(positions).length} Roles
-                        </p>
-                      </div>
                       {positions &&
                         Object.values(positions)[0]?.[0]?.tenderId && !searchParams.get("tenderId") && (
                           <Link
@@ -1692,13 +1749,27 @@ export default function MatchResults() {
                               return (
                                 <div
                                   key={positionTitle}
-                                  className="group/position"
+                                  className={clsx(
+                                    "group/position border-l-4 transition-colors",
+                                    isPosExpanded ? "border-l-blue-300" : "border-l-transparent",
+                                  )}
                                 >
                                   <div
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-expanded={isPosExpanded}
+                                    onClick={() => togglePosition(tenderName, positionTitle)}
+                                    onKeyDown={(event) => {
+                                      if (event.target !== event.currentTarget) return;
+                                      if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault();
+                                        togglePosition(tenderName, positionTitle);
+                                      }
+                                    }}
                                     className={clsx(
-                                      "w-full pl-6 sm:pl-16 pr-4 sm:pr-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 transition-colors text-left",
+                                      "w-full pl-6 sm:pl-16 pr-4 sm:pr-6 py-4 flex cursor-pointer flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 transition-colors text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500",
                                       isPosExpanded
-                                        ? "bg-slate-50"
+                                        ? "bg-blue-50/30"
                                         : "hover:bg-slate-50/50",
                                     )}
                                   >
@@ -1706,10 +1777,11 @@ export default function MatchResults() {
                                       <input
                                         type="checkbox"
                                         checked={positionMatches.length > 0 && positionMatches.every((m: any) => selectedMatchIds.includes(m.id))}
+                                        onClick={(event) => event.stopPropagation()}
                                         onChange={() => togglePositionSelection(positionMatches)}
                                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                       />
-                                      <button onClick={() => togglePosition(tenderName, positionTitle)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                                      <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
                                         <div
                                           className={clsx(
                                             "w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0",
@@ -1725,11 +1797,11 @@ export default function MatchResults() {
                                             {positionTitle}
                                           </span>
                                         </div>
-                                      </button>
+                                      </div>
                                     </div>
                                     <div className="flex items-center gap-4 shrink-0 justify-between sm:justify-end w-full sm:w-auto pl-11 sm:pl-0">
                                       <span className="text-xs font-medium text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-md shadow-sm">
-                                        {positionMatches.length} candidates
+                                        {positionMatches.length} candidates · Best {Math.max(...positionMatches.map((match: any) => Number(match.score) || 0))}%
                                       </span>
                                       <ChevronRight
                                         size={18}
@@ -1793,7 +1865,12 @@ export default function MatchResults() {
           return (
             <Fragment key={match.id || matchIdx}>
               <tr 
-                className={clsx("hover:bg-blue-50/50 transition-colors cursor-pointer", isMatchExpanded ? "bg-blue-50/30" : "")}
+                className={clsx(
+                  "cursor-pointer border-l-4 transition-colors focus-within:bg-blue-50/50",
+                  isMatchExpanded
+                    ? "border-l-blue-500 bg-blue-50/50"
+                    : "border-l-transparent hover:bg-blue-50/40",
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   setExpandedMatchId(isMatchExpanded ? null : match.id);
@@ -1836,7 +1913,7 @@ export default function MatchResults() {
                     aria-label={isMatchExpanded ? "Collapse candidate details" : "Expand candidate details"}
                     aria-expanded={isMatchExpanded}
                   >
-                     <ChevronDown className={clsx("transition-transform duration-200", isMatchExpanded && "rotate-180")} size={20} />
+                     <ChevronRight className={clsx("transition-transform duration-200", isMatchExpanded && "rotate-90")} size={20} />
                   </button>
                 </td>
               </tr>
