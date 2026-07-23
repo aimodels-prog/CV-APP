@@ -39,6 +39,14 @@ interface PortalSsoConfig {
   secureCookies: boolean;
 }
 
+function preventAuthenticationCaching(res: Response) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("CDN-Cache-Control", "no-store");
+  res.setHeader("Surrogate-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+}
+
 function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required for VIA Portal SSO.`);
@@ -347,7 +355,8 @@ async function sessionUser(pool: Pool, token: string): Promise<PortalSessionUser
 function isPublicAsset(pathname: string): boolean {
   return pathname.startsWith("/assets/")
     || pathname === "/favicon.ico"
-    || pathname === "/via-international-logo.png";
+    || pathname === "/via-international-logo.png"
+    || pathname === "/site.webmanifest";
 }
 
 export function createPortalSso(pool: Pool) {
@@ -364,7 +373,7 @@ export function createPortalSso(pool: Pool) {
     try {
       const payload = verifyPortalToken(portalToken, config);
       const session = await createSession(pool, payload, req, config);
-      res.setHeader("Cache-Control", "no-store");
+      preventAuthenticationCaching(res);
       setSessionCookie(res, session.token, config);
       res.redirect(303, cleanCallbackPath(req));
     } catch (error) {
@@ -387,6 +396,7 @@ export function createPortalSso(pool: Pool) {
       if (req.path.startsWith("/api/")) {
         return res.status(401).json({ error: { code: "AUTH_REQUIRED", message: "VIA Portal authentication is required." } });
       }
+      preventAuthenticationCaching(res);
       res.redirect(302, config.portalUrl.toString());
     })().catch((error) => {
       console.error("VIA Portal session validation failed:", error);
@@ -395,11 +405,11 @@ export function createPortalSso(pool: Pool) {
   };
 
   router.get("/login", (req, res) => {
-    res.setHeader("Cache-Control", "no-store");
+    preventAuthenticationCaching(res);
     res.redirect(302, config.portalUrl.toString());
   });
   router.get("/me", (req, res) => {
-    res.setHeader("Cache-Control", "no-store");
+    preventAuthenticationCaching(res);
     res.json({ user: res.locals.portalUser as PortalSessionUser });
   });
   router.post("/logout", (req, res) => {
@@ -408,7 +418,7 @@ export function createPortalSso(pool: Pool) {
       if (token) {
         await pool.query("UPDATE portal_sessions SET revoked_at = NOW() WHERE session_hash = $1", [sessionHash(token)]);
       }
-      res.setHeader("Cache-Control", "no-store");
+      preventAuthenticationCaching(res);
       clearSessionCookie(res, config);
       res.json({ redirectTo: config.portalUrl.toString() });
     })().catch((error) => {

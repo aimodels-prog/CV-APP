@@ -82,15 +82,15 @@ function imagePixelSize(dataUrl: string, bytes: Uint8Array) {
 function brandingImageParagraph(
   dataUrl: string | undefined,
   targetWidth: number,
-  maxHeight: number,
+  _maxHeight: number,
 ) {
   if (!dataUrl) return new Paragraph({ children: [] });
   const bytes = dataUriBytes(dataUrl);
   if (!bytes) return new Paragraph({ children: [] });
   const size = imagePixelSize(dataUrl, bytes);
-  const widthScale = targetWidth / Math.max(1, size.width);
-  const heightScale = maxHeight / Math.max(1, size.height);
-  const scale = Math.min(widthScale, heightScale);
+  // Lock branding to the full Word content width. Its height must not reduce
+  // the horizontal span of the header or footer.
+  const scale = targetWidth / Math.max(1, size.width);
   const width = Math.max(1, Math.round(size.width * scale));
   const height = Math.max(1, Math.round(size.height * scale));
   const type = /^data:image\/png/i.test(dataUrl) ? "png" : "jpg";

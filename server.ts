@@ -3,6 +3,7 @@ dotenv.config({ override: true });
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "node:path";
+import fs from "node:fs";
 import multer from "multer";
 import { createPostgresPool } from "./src/backend/database/postgres.ts";
 import { runPostgresMigrations } from "./src/backend/database/migrationRunner.ts";
@@ -110,6 +111,13 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     const assetsPath = path.join(distPath, "assets");
+    const preventHtmlCaching = (res: express.Response) => {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("CDN-Cache-Control", "no-store");
+      res.setHeader("Surrogate-Control", "no-store");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    };
 
     // Vite filenames are content-hashed and may be cached permanently. A missing
     // asset must remain a 404; returning the SPA HTML causes a module MIME error.
@@ -120,8 +128,20 @@ async function startServer() {
         maxAge: "1y",
       }),
     );
-    app.use("/assets", (_req, res) => {
-      res.status(404).type("text/plain").send("Asset not found.");
+    app.use("/assets", (req, res) => {
+      const staleEntry = /^\/index-[A-Za-z0-9_-]+\.(js|css)$/.exec(req.path);
+      if (staleEntry) {
+        const extension = path.extname(staleEntry[0]);
+        const currentEntry = fs.readdirSync(assetsPath).find((filename) =>
+          new RegExp(`^index-[A-Za-z0-9_-]+\\${extension}$`).test(filename),
+        );
+        if (currentEntry) {
+          preventHtmlCaching(res);
+          res.setHeader("X-VIA-Stale-Asset-Recovery", "1");
+          return res.sendFile(path.join(assetsPath, currentEntry));
+        }
+      }
+      return res.status(404).type("text/plain").send("Asset not found.");
     });
 
     app.use(
@@ -129,13 +149,13 @@ async function startServer() {
         index: false,
         setHeaders: (res, filePath) => {
           if (filePath.endsWith(".html")) {
-            res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+            preventHtmlCaching(res);
           }
         },
       }),
     );
     app.get("*", (_req, res) => {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      preventHtmlCaching(res);
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

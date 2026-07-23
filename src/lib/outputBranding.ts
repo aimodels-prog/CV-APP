@@ -20,7 +20,13 @@ export const resolveOutputBranding = (
   customBranding?: OutputBranding | null,
   tenderBranding?: OutputBranding | null,
 ) => {
-  if (hasBrandingImage(customBranding)) return customBranding;
+  // A linked per-CV profile is an intentional override. Older generated CVs
+  // only contain an unlinked image snapshot; that stale snapshot must not hide
+  // the tender's current branding profile after it has been edited.
+  if (customBranding?.profile_id && hasBrandingImage(customBranding)) {
+    return customBranding;
+  }
   if (hasBrandingImage(tenderBranding)) return tenderBranding;
+  if (hasBrandingImage(customBranding)) return customBranding;
   return undefined;
 };

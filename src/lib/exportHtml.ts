@@ -18,7 +18,8 @@ const addBrandingImage = (
   const format = pdfImageFormat(dataUrl);
   if (!format) return;
   const properties = pdf.getImageProperties(dataUrl);
-  const scale = Math.min(maxWidth / properties.width, maxHeight / properties.height);
+  // Lock branding to the full document width; height only controls placement.
+  const scale = maxWidth / properties.width;
   const width = properties.width * scale;
   const height = properties.height * scale;
   pdf.addImage(

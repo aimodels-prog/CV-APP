@@ -744,7 +744,29 @@ export function createPostgresApiRouter(pool: Pool) {
       const limit = boundedInteger(req.query.limit, 5000, 1, 10_000);
       const offset = boundedInteger(req.query.offset, 0, 0, 10_000_000);
       const result = await pool.query(
-        `SELECT * FROM tenders ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+        `
+          SELECT
+            tender.*,
+            CASE
+              WHEN branding.id IS NULL THEN tender.data
+              ELSE JSONB_SET(
+                tender.data,
+                '{branding}',
+                JSONB_BUILD_OBJECT(
+                  'profile_id', branding.id,
+                  'profile_name', branding.name,
+                  'header_base64', COALESCE(branding.data->>'header_base64', ''),
+                  'footer_base64', COALESCE(branding.data->>'footer_base64', '')
+                ),
+                TRUE
+              )
+            END AS data
+          FROM tenders AS tender
+          LEFT JOIN brandings AS branding
+            ON branding.id = tender.data->'branding'->>'profile_id'
+          ORDER BY tender.created_at DESC
+          LIMIT $1 OFFSET $2
+        `,
         [limit, offset],
       );
       res.json(result.rows.map(tenderFromRow));
@@ -754,9 +776,31 @@ export function createPostgresApiRouter(pool: Pool) {
   router.get(
     "/tenders/:id",
     asyncRoute(async (req, res) => {
-      const result = await pool.query(`SELECT * FROM tenders WHERE id = $1`, [
-        req.params.id,
-      ]);
+      const result = await pool.query(
+        `
+          SELECT
+            tender.*,
+            CASE
+              WHEN branding.id IS NULL THEN tender.data
+              ELSE JSONB_SET(
+                tender.data,
+                '{branding}',
+                JSONB_BUILD_OBJECT(
+                  'profile_id', branding.id,
+                  'profile_name', branding.name,
+                  'header_base64', COALESCE(branding.data->>'header_base64', ''),
+                  'footer_base64', COALESCE(branding.data->>'footer_base64', '')
+                ),
+                TRUE
+              )
+            END AS data
+          FROM tenders AS tender
+          LEFT JOIN brandings AS branding
+            ON branding.id = tender.data->'branding'->>'profile_id'
+          WHERE tender.id = $1
+        `,
+        [req.params.id],
+      );
       if (!result.rowCount) {
         throw new HttpError(404, "NOT_FOUND", "Tender not found.");
       }
@@ -1148,7 +1192,28 @@ export function createPostgresApiRouter(pool: Pool) {
     "/generated-cvs",
     asyncRoute(async (_req, res) => {
       const result = await pool.query(
-        `SELECT * FROM generated_cvs ORDER BY created_at DESC`,
+        `
+          SELECT
+            generated_cv.*,
+            CASE
+              WHEN branding.id IS NULL THEN generated_cv.data
+              ELSE JSONB_SET(
+                generated_cv.data,
+                '{customBranding}',
+                JSONB_BUILD_OBJECT(
+                  'profile_id', branding.id,
+                  'profile_name', branding.name,
+                  'header_base64', COALESCE(branding.data->>'header_base64', ''),
+                  'footer_base64', COALESCE(branding.data->>'footer_base64', '')
+                ),
+                TRUE
+              )
+            END AS data
+          FROM generated_cvs AS generated_cv
+          LEFT JOIN brandings AS branding
+            ON branding.id = generated_cv.data->'customBranding'->>'profile_id'
+          ORDER BY generated_cv.created_at DESC
+        `,
       );
       res.json(result.rows.map(cvFromRow));
     }),
